@@ -353,11 +353,11 @@ body[data-mode="light"] .cell.constraint-highlight { filter: brightness(0.93); }
 .cell.number-highlight { background-image: linear-gradient(var(--num-hl), var(--num-hl)) !important; }
 
 .cell.cage-highlight {
-  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.55) !important;
+  box-shadow: inset 0 0 0 2.5px rgba(255, 255, 255, 0.84) !important;
   filter: none;
 }
 body[data-mode="light"] .cell.cage-highlight {
-  box-shadow: inset 0 0 0 1.5px rgba(17, 24, 39, 0.45) !important;
+  box-shadow: inset 0 0 0 2.5px rgba(17, 24, 39, 0.80) !important;
   filter: none;
 }
 
@@ -374,7 +374,7 @@ body[data-mode="light"] .cell.cage-highlight {
 body.pencil-mode-active .cell.active-cell,
 .cell.draft-mode.active-cell {
   background-image: none !important;
-  box-shadow: inset 0 0 0 4px #FFFFFF !important;
+  box-shadow: inset 0 0 0 4.5px #FFFFFF !important;
   filter: none !important;
   font-weight: 700;
   z-index: 2;
@@ -385,7 +385,7 @@ body[data-mode="light"] .cell.active-cell.cage-highlight,
 body[data-mode="light"] .cell.active-cell.constraint-highlight,
 body[data-mode="light"].pencil-mode-active .cell.active-cell,
 body[data-mode="light"] .cell.draft-mode.active-cell {
-  box-shadow: inset 0 0 0 4px #111827 !important;
+  box-shadow: inset 0 0 0 4.5px #111827 !important;
 }
 
 body:not([data-mode="light"]) .cell .main-value {

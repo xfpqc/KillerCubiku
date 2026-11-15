@@ -6,20 +6,20 @@ let currentVariant = "killer";
 let currentCages = [];
 let cageMap = [];
 
-/* Saturated, untinted jewel tones for dark mode (clean pastels derived in light mode) */
+/* Muted, matte jewel tones for dark mode (clean pastels derived in light mode) */
 const CAGE_RGB = [
-    '206, 44, 54',    /* Crimson Red */
-    '208, 92, 20',    /* Vivid Tangerine */
-    '178, 134, 16',   /* Rich Amber Gold */
-    '68, 152, 46',    /* Fresh Leaf */
-    '22, 156, 92',    /* Emerald */
-    '16, 148, 148',   /* Vibrant Teal */
-    '28, 130, 208',   /* Cerulean */
-    '56, 94, 218',    /* Royal Cobalt */
-    '110, 74, 214',   /* Electric Indigo */
-    '164, 58, 202',   /* Vivid Amethyst */
-    '204, 46, 132',   /* Magenta Rose */
-    '76, 116, 158'    /* Steel Blue */
+    '152, 52, 58',    /* Muted Crimson */
+    '158, 78, 42',    /* Terracotta */
+    '142, 108, 38',   /* Warm Ochre */
+    '64, 122, 62',    /* Sage Green */
+    '42, 122, 86',    /* Jade Pine */
+    '42, 116, 122',   /* Deep Teal */
+    '48, 102, 152',   /* Steel Cerulean */
+    '68, 88, 158',    /* Muted Cobalt */
+    '98, 74, 154',    /* Dusk Indigo */
+    '132, 68, 142',   /* Muted Plum */
+    '152, 58, 104',   /* Dusty Berry */
+    '74, 96, 118'     /* Cool Slate */
 ];
 
 const CAGE_COLORS = CAGE_RGB.map(rgb => `rgb(${rgb})`);
@@ -37,7 +37,7 @@ function getCageBackground(cage) {
 
     if (!rgbStr) return '';
 
-    /* Dark mode: pure unblended color (no dark-grey tint) */
+    /* Dark mode: matte untinted color (no grey wash, no neon glare) */
     if (!isLight) {
         return `rgb(${rgbStr})`;
     }
