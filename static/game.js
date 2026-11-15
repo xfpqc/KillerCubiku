@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v73 — Killer 3D Sudoku (Fiendish Difficulty + Interactive Tutorial)
+ * Cubiku Variants v74 — Killer 3D Sudoku (Dark & Light Mode + Interactive Tutorial)
  */
 
 let currentVariant = "killer";
@@ -7,20 +7,33 @@ let currentCages = [];
 let cageMap = [];
 
 /* High-contrast, UI-friendly cage colors */
-const CAGE_COLORS = [
-    'rgba(255, 59, 48, 0.35)',    /* Coral Red (Warm) */
-    'rgba(255, 110, 0, 0.35)',    /* Deep Orange */
-    'rgba(255, 240, 0, 0.35)',    /* Bright Lemon */
-    'rgba(212, 251, 121, 0.35)',  /* Neon Chartreuse */
-    'rgba(76, 217, 100, 0.35)',   /* Apple Green */
-    'rgba(0, 224, 184, 0.35)',    /* Turquoise */
-    'rgba(90, 200, 250, 0.35)',   /* Light Aqua */
-    'rgba(0, 122, 255, 0.35)',    /* Bright Azure */
-    'rgba(88, 86, 214, 0.35)',    /* Deep Indigo */
-    'rgba(175, 82, 222, 0.35)',   /* Amethyst */
-    'rgba(255, 0, 150, 0.35)',    /* Shocking Fuchsia */
-    'rgba(170, 185, 200, 0.35)'   /* Platinum Blue-Grey */
+const CAGE_RGB = [
+    '255, 59, 48',    /* Coral Red (Warm) */
+    '255, 110, 0',    /* Deep Orange */
+    '255, 240, 0',    /* Bright Lemon */
+    '212, 251, 121',  /* Neon Chartreuse */
+    '76, 217, 100',   /* Apple Green */
+    '0, 224, 184',    /* Turquoise */
+    '90, 200, 250',   /* Light Aqua */
+    '0, 122, 255',    /* Bright Azure */
+    '88, 86, 214',    /* Deep Indigo */
+    '175, 82, 222',   /* Amethyst */
+    '255, 0, 150',    /* Shocking Fuchsia */
+    '170, 185, 200'   /* Platinum Blue-Grey */
 ];
+
+const CAGE_COLORS = CAGE_RGB.map(rgb => `rgba(${rgb}, 0.35)`);
+
+function getCageBackground(cage) {
+    const alpha = currentColorMode === 'light' ? 0.24 : 0.35;
+    if (typeof cage.colorIndex === 'number' && CAGE_RGB[cage.colorIndex]) {
+        return `rgba(${CAGE_RGB[cage.colorIndex]}, ${alpha})`;
+    }
+    if (typeof cage.color === 'string') {
+        return cage.color.replace(/rgba\(\s*(\d+\s*,\s*\d+\s*,\s*\d+\s*,)\s*[\d.]+\s*\)/, `rgba($1 ${alpha})`);
+    }
+    return '';
+}
 
 function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
@@ -138,11 +151,13 @@ function generateCages(solvedGrid, difficulty = 'medium') {
                 }
             }
             if (!merged) {
-                cages.push({ id: cageId, cells: cageCells, sum: sum, color: CAGE_COLORS[cageId % CAGE_COLORS.length] });
+                const colorIdx = cageId % CAGE_COLORS.length;
+                cages.push({ id: cageId, cells: cageCells, sum: sum, colorIndex: colorIdx, color: CAGE_COLORS[colorIdx] });
                 cageId++;
             }
         } else {
-            cages.push({ id: cageId, cells: cageCells, sum: sum, color: CAGE_COLORS[cageId % CAGE_COLORS.length] });
+            const colorIdx = cageId % CAGE_COLORS.length;
+            cages.push({ id: cageId, cells: cageCells, sum: sum, colorIndex: colorIdx, color: CAGE_COLORS[colorIdx] });
             cageId++;
         }
     }
@@ -649,7 +664,6 @@ async function maintainCache() {
     const diffs = ['easy', 'medium', 'hard', 'fiendish'];
     
     for (const diff of diffs) {
-        // Only queue up 1 fiendish at a time to prevent lag spikes, 2 for others
         const targetCount = diff === 'fiendish' ? 1 : 2;
         while (boardCache[diff].length < targetCount) {
             console.log(`[Cache] Generating backup for ${diff}...`);
@@ -770,6 +784,7 @@ let activeNumber = null;
 let inspectedNumber = null;
 let currentDifficulty = "medium";
 let currentTheme = "gold";
+let currentColorMode = "dark";
 let stickyKeysEnabled = false; 
 let pencilMode = false;
 let isGameComplete = false; 
@@ -781,8 +796,42 @@ let stats = {
   fiendish: { wins: 0, bestTime: null, totalTime: 0, lastTime: null }
 };
 
+const THEME_LABELS = {
+  dark:  { cyan: 'Cyan', lavender: 'Lavender', rose: 'Rose',    gold: 'Gold',  silver: 'Silver' },
+  light: { cyan: 'Teal', lavender: 'Violet',   rose: 'Crimson', gold: 'Amber', silver: 'Slate' }
+};
+
+function syncThemeOptionLabels() {
+  const themeSelect = document.getElementById('theme-select');
+  if (!themeSelect) return;
+  const labels = THEME_LABELS[currentColorMode] || THEME_LABELS.dark;
+  Array.from(themeSelect.options).forEach(opt => {
+    if (labels[opt.value]) opt.textContent = labels[opt.value];
+  });
+}
+
+function applyColorMode(mode) {
+  currentColorMode = mode === 'light' ? 'light' : 'dark';
+  document.body.setAttribute('data-mode', currentColorMode);
+
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) {
+    metaTheme.setAttribute('content', currentColorMode === 'light' ? '#FFFFFF' : '#121212');
+  }
+
+  const lightToggle = document.getElementById('toggle-light-mode');
+  if (lightToggle) lightToggle.checked = currentColorMode === 'light';
+
+  syncThemeOptionLabels();
+}
+
 function savePreferences() {
-  localStorage.setItem('cubiku_killer_prefs_v2', JSON.stringify({ theme: currentTheme, sticky: stickyKeysEnabled, difficulty: currentDifficulty }));
+  localStorage.setItem('cubiku_killer_prefs_v2', JSON.stringify({
+    theme: currentTheme,
+    mode: currentColorMode,
+    sticky: stickyKeysEnabled,
+    difficulty: currentDifficulty
+  }));
 }
 
 function loadPreferences() {
@@ -791,6 +840,7 @@ function loadPreferences() {
     try {
       const prefs = JSON.parse(savedPrefs);
       currentTheme = prefs.theme || "gold";
+      currentColorMode = prefs.mode || "dark";
       stickyKeysEnabled = !!prefs.sticky;
       currentDifficulty = prefs.difficulty || "medium";
       
@@ -805,6 +855,7 @@ function loadPreferences() {
       if (diffSelect) diffSelect.value = currentDifficulty;
     } catch(e) {}
   }
+  applyColorMode(currentColorMode);
 }
 
 function saveStats() {
@@ -859,7 +910,7 @@ function updateStatsUI() {
 
 function saveGame() {
   if (clueSet.size === 0 && currentCages.length === 0) return; 
-  if (tutorialActive) return; // Do not overwrite save with tutorial board
+  if (tutorialActive) return;
   
   const saveData = {
     state, drafts: drafts.map(zLevel => zLevel.map(row => row.map(cellSet => Array.from(cellSet)))),
@@ -1094,7 +1145,7 @@ function renderState() {
         
         if (cageMap && cageMap[z][row][col]) {
             const cage = cageMap[z][row][col];
-            el.style.backgroundColor = cage.color;
+            el.style.backgroundColor = getCageBackground(cage);
             if (cage.cells[0].z === z && cage.cells[0].y === row && cage.cells[0].x === col) {
                 cageSumSpan.textContent = cage.sum;
             } else { cageSumSpan.textContent = ''; }
@@ -1303,8 +1354,6 @@ function onCellPointerDown(e) {
   if (activeNumber !== null) {
     if (activeNumber === 'erase') fillCell(z, row, col, ''); else fillCell(z, row, col, activeNumber);
     
-    // BUG FIX: If placing this number caused it to deplete, the engine wiped activeNumber to null.
-    // Intercept to ensure the cell does NOT get re-selected by Sticky Keys!
     if (activeNumber === null) {
         clearSelection();
     } else if (!stickyKeysEnabled && !pencilMode) { 
@@ -1504,8 +1553,8 @@ function startTutorial() {
     drafts = emptyDrafts();
     clueSet = new Set();
     currentCages = [
-        { id: 0, cells: [{z:0,y:0,x:0}, {z:0,y:0,x:1}], sum: 15, color: CAGE_COLORS[0] },
-        { id: 1, cells: [{z:1,y:1,x:1}, {z:1,y:1,x:2}], sum: 7, color: CAGE_COLORS[2] }
+        { id: 0, cells: [{z:0,y:0,x:0}, {z:0,y:0,x:1}], sum: 15, colorIndex: 0, color: CAGE_COLORS[0] },
+        { id: 1, cells: [{z:1,y:1,x:1}, {z:1,y:1,x:2}], sum: 7,  colorIndex: 2, color: CAGE_COLORS[2] }
     ];
     cageMap = buildCageMap(currentCages);
     
@@ -1589,6 +1638,12 @@ function init() {
   const btnZen = document.getElementById('btn-zen'); if (btnZen) btnZen.addEventListener('click', toggleZen);
   const btnSettingsReset = document.getElementById('btn-settings-reset-stats'); if (btnSettingsReset) btnSettingsReset.addEventListener('click', (e) => { e.stopPropagation(); resetStats(); });
   const btnSettingsTut = document.getElementById('btn-settings-tutorial'); if (btnSettingsTut) btnSettingsTut.addEventListener('click', startTutorial);
+
+  const toggleLight = document.getElementById('toggle-light-mode'); if (toggleLight) toggleLight.addEventListener('change', (e) => {
+      applyColorMode(e.target.checked ? 'light' : 'dark');
+      savePreferences();
+      renderState();
+  });
   
   const themeSelect = document.getElementById('theme-select'); if (themeSelect) themeSelect.addEventListener('change', (e) => { 
       currentTheme = e.target.value; 
