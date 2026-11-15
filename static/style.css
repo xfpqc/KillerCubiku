@@ -357,7 +357,7 @@ body[data-mode="light"] .cell.constraint-highlight { filter: brightness(0.93); }
   filter: none;
 }
 body[data-mode="light"] .cell.cage-highlight {
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.92), inset 0 0 0 2.75px rgba(17, 24, 39, 0.25) !important;
+  box-shadow: inset 0 0 0 2px #6B7280 !important;
   filter: none;
 }
 
@@ -385,7 +385,7 @@ body[data-mode="light"] .cell.active-cell.cage-highlight,
 body[data-mode="light"] .cell.active-cell.constraint-highlight,
 body[data-mode="light"].pencil-mode-active .cell.active-cell,
 body[data-mode="light"] .cell.draft-mode.active-cell {
-  box-shadow: inset 0 0 0 3px #FFFFFF, inset 0 0 0 4px rgba(17, 24, 39, 0.35) !important;
+  box-shadow: inset 0 0 0 3px #4B5563 !important;
 }
 
 body:not([data-mode="light"]) .cell .main-value {
