@@ -83,8 +83,8 @@ body[data-theme="silver"]   { --accent: #9CA3AF; --ch-bg: rgba(156, 163, 175, 0.
 /* ── Light Mode Theme Definitions (High-Contrast Ink Pairs) ─ */
 
 body[data-mode="light"][data-theme="cyan"]     { --accent: #0E7490; --ch-bg: rgba(14, 116, 144, 0.12); --num-hl: rgba(14, 116, 144, 0.24); }
-body[data-mode="light"][data-theme="lavender"] { --accent: #6D28D9; --ch-bg: rgba(109, 40, 217, 0.11); --num-hl: rgba(109, 40, 217, 0.22); }
-body[data-mode="light"][data-theme="rose"]     { --accent: #BE123C; --ch-bg: rgba(190, 18, 60, 0.11);  --num-hl: rgba(190, 18, 60, 0.22); }
+body[data-mode="light"][data-theme="lavender"] { --accent: #5E4388; --ch-bg: rgba(94, 67, 136, 0.11);  --num-hl: rgba(94, 67, 136, 0.22); }
+body[data-mode="light"][data-theme="rose"]     { --accent: #9B344D; --ch-bg: rgba(155, 52, 77, 0.11);  --num-hl: rgba(155, 52, 77, 0.22); }
 body[data-mode="light"][data-theme="gold"]     { --accent: #B45309; --ch-bg: rgba(180, 83, 9, 0.12);   --num-hl: rgba(180, 83, 9, 0.24); }
 body[data-mode="light"][data-theme="silver"]   { --accent: #1F2937; --ch-bg: rgba(31, 41, 55, 0.11);   --num-hl: rgba(31, 41, 55, 0.21); }
 

@@ -6,7 +6,7 @@ let currentVariant = "killer";
 let currentCages = [];
 let cageMap = [];
 
-/* Muted, matte jewel tones for dark mode (clean pastels derived in light mode) */
+/* Muted, matte jewel tones for dark mode */
 const CAGE_RGB = [
     '152, 52, 58',    /* Muted Crimson */
     '158, 78, 42',    /* Terracotta */
@@ -22,34 +22,43 @@ const CAGE_RGB = [
     '74, 96, 118'     /* Cool Slate */
 ];
 
+/* Distinct, higher-contrast pastels for light mode (alternating warm/cool) */
+const CAGE_LIGHT_RGB = [
+    '239, 154, 154',  /* Soft Coral */
+    '144, 202, 249',  /* Clear Sky Blue */
+    '248, 196, 113',  /* Warm Marigold */
+    '165, 214, 167',  /* Fresh Sage */
+    '206, 147, 216',  /* Soft Orchid */
+    '128, 222, 234',  /* Crisp Aqua */
+    '255, 183, 138',  /* Warm Apricot */
+    '159, 168, 218',  /* Periwinkle */
+    '197, 225, 165',  /* Meadow Lime */
+    '244, 143, 177',  /* Rose Pink */
+    '128, 203, 196',  /* Seafoam Mint */
+    '176, 190, 197'   /* Cool Blue-Slate */
+];
+
 const CAGE_COLORS = CAGE_RGB.map(rgb => `rgb(${rgb})`);
 
 function getCageBackground(cage) {
     const isLight = currentColorMode === 'light';
+    const palette = isLight ? CAGE_LIGHT_RGB : CAGE_RGB;
 
-    let rgbStr = null;
-    if (typeof cage.colorIndex === 'number' && CAGE_RGB[cage.colorIndex]) {
-        rgbStr = CAGE_RGB[cage.colorIndex];
-    } else if (typeof cage.color === 'string') {
+    if (typeof cage.colorIndex === 'number' && palette[cage.colorIndex]) {
+        return `rgb(${palette[cage.colorIndex]})`;
+    }
+    if (typeof cage.color === 'string') {
+        if (!isLight) return cage.color;
         const match = cage.color.match(/rgba?\(\s*(\d+\s*,\s*\d+\s*,\s*\d+)/);
-        if (match) rgbStr = match[1];
+        if (match) {
+            const idx = CAGE_RGB.indexOf(match[1].replace(/\s+/g, ', '));
+            if (idx !== -1 && CAGE_LIGHT_RGB[idx]) {
+                return `rgb(${CAGE_LIGHT_RGB[idx]})`;
+            }
+        }
+        return cage.color;
     }
-
-    if (!rgbStr) return '';
-
-    /* Dark mode: matte untinted color (no grey wash, no neon glare) */
-    if (!isLight) {
-        return `rgb(${rgbStr})`;
-    }
-
-    /* Light mode: clean pastel blend over white */
-    const alpha = 0.31;
-    const [r, g, b] = rgbStr.split(',').map(n => {
-        const fg = Number(n.trim());
-        return Math.round(fg * alpha + 255 * (1 - alpha));
-    });
-
-    return `rgb(${r}, ${g}, ${b})`;
+    return '';
 }
 
 function shuffleArray(array) {
@@ -112,9 +121,9 @@ function generateCages(solvedGrid, difficulty = 'medium') {
         const start = unassigned.pop();
         
         let targetSize;
-        if (difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;         
+        if (difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;          
         else if (difficulty === 'hard' || difficulty === 'fiendish') targetSize = Math.floor(Math.random() * 2) + 3;    
-        else targetSize = Math.floor(Math.random() * 2) + 2;                               
+        else targetSize = Math.floor(Math.random() * 2) + 2;                                
 
         const cageCells = [start];
         let sum = solvedGrid[start.z][start.y][start.x];
