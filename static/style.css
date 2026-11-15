@@ -400,7 +400,7 @@ body.pencil-mode-active .cell.active-cell,
 .cell.flash-conflict { color: var(--flash-color) !important; transition: color 0s; }
 .cell.conflict { background-image: linear-gradient(var(--conflict-bg), var(--conflict-bg)) !important; color: var(--error-color) !important; }
 .cell.clue.conflict { color: var(--error-color) !important; }
-.grid.loading .cell { opacity: 0.3; pointer-events: none; }
+.grid.loading { opacity: 0.35; pointer-events: none; }
 
 .keyboard-container { display: grid; grid-template-columns: repeat(6, 1fr); justify-content: center; align-items: center; margin: 0.5rem auto 0; width: 100%; }
 .key-btn { display: flex; justify-content: center; align-items: center; width: 100%; background: var(--surface-subtle); border: 1px solid var(--grid-line); color: var(--text-primary); font-family: inherit; font-weight: 600; cursor: pointer; transition: background 0.15s, transform 0.1s, border-color 0.15s; touch-action: manipulation; padding: 0; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }

@@ -1480,8 +1480,7 @@ async function newGame() {
 
 async function checkSolution() {
   if (isGameComplete || tutorialActive) return; 
-  hideMessage(); document.querySelectorAll('.cell.conflict').forEach(c => c.classList.remove('conflict')); setLoading(true);
-  await new Promise(resolve => setTimeout(resolve, 50));
+  hideMessage(); document.querySelectorAll('.cell.conflict').forEach(c => c.classList.remove('conflict'));
 
   try {
     const data = check3SSC(state, 3, currentVariant);
@@ -1502,7 +1501,7 @@ async function checkSolution() {
         });
       }
     }
-  } catch (err) { showMessage(`Could not check solution: ${err.message}`, 'error'); } finally { setLoading(false); }
+  } catch (err) { showMessage(`Could not check solution: ${err.message}`, 'error'); }
 }
 
 // ---------------------------------------------------------
