@@ -25,14 +25,26 @@ const CAGE_RGB = [
 const CAGE_COLORS = CAGE_RGB.map(rgb => `rgba(${rgb}, 0.35)`);
 
 function getCageBackground(cage) {
-    const alpha = currentColorMode === 'light' ? 0.24 : 0.35;
+    const isLight = currentColorMode === 'light';
+    const alpha = isLight ? 0.24 : 0.35;
+    const base = isLight ? 255 : 18;
+
+    let rgbStr = null;
     if (typeof cage.colorIndex === 'number' && CAGE_RGB[cage.colorIndex]) {
-        return `rgba(${CAGE_RGB[cage.colorIndex]}, ${alpha})`;
+        rgbStr = CAGE_RGB[cage.colorIndex];
+    } else if (typeof cage.color === 'string') {
+        const match = cage.color.match(/rgba?\(\s*(\d+\s*,\s*\d+\s*,\s*\d+)/);
+        if (match) rgbStr = match[1];
     }
-    if (typeof cage.color === 'string') {
-        return cage.color.replace(/rgba\(\s*(\d+\s*,\s*\d+\s*,\s*\d+\s*,)\s*[\d.]+\s*\)/, `rgba($1 ${alpha})`);
-    }
-    return '';
+
+    if (!rgbStr) return '';
+
+    const [r, g, b] = rgbStr.split(',').map(n => {
+        const fg = Number(n.trim());
+        return Math.round(fg * alpha + base * (1 - alpha));
+    });
+
+    return `rgb(${r}, ${g}, ${b})`;
 }
 
 function shuffleArray(array) {
@@ -95,9 +107,9 @@ function generateCages(solvedGrid, difficulty = 'medium') {
         const start = unassigned.pop();
         
         let targetSize;
-        if (difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;       
-        else if (difficulty === 'hard' || difficulty === 'fiendish') targetSize = Math.floor(Math.random() * 2) + 3;  
-        else targetSize = Math.floor(Math.random() * 2) + 2;                             
+        if (difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;        
+        else if (difficulty === 'hard' || difficulty === 'fiendish') targetSize = Math.floor(Math.random() * 2) + 3;   
+        else targetSize = Math.floor(Math.random() * 2) + 2;                              
 
         const cageCells = [start];
         let sum = solvedGrid[start.z][start.y][start.x];
@@ -776,8 +788,8 @@ let state        = emptyGrid();
 let drafts       = emptyDrafts();
 let initialGrid  = emptyGrid(); 
 let solvedGrid   = null;
-let clueSet      = new Set();         
-let selected     = null;            
+let clueSet      = new Set();          
+let selected     = null;             
 let undoStack    = [];
 
 let activeNumber = null;
@@ -1094,7 +1106,7 @@ function buildGrids() {
     for (let row = 0; row < 3; row++) {
       for (let col = 0; col < 3; col++) {
         const cell = document.createElement('div');
-        cell.id         = cellId(z, row, col);
+        cell.id          = cellId(z, row, col);
         cell.className   = 'cell';
         cell.dataset.z   = z;
         cell.dataset.row = row;
@@ -1514,16 +1526,16 @@ const tutorialSteps = [
     { 
         title: "The Cages", 
         text: "The colored areas are Cages. Digits cannot repeat inside a single cage, and they must add up to the small target number in the top-left corner.", 
-        setup: () => {
-            clearHighlights();
+        setup: () => { 
+            clearHighlights(); 
             getCell(0, 0, 0).classList.add('tutorial-highlight'); getCell(0, 0, 1).classList.add('tutorial-highlight');
         } 
     },
     { 
         title: "The Rule of 45", 
         text: "Because every 3x3 plane always contains exactly the digits 1-9, the total sum of the entire plane is ALWAYS 45. This is your secret weapon.", 
-        setup: () => {
-            clearHighlights();
+        setup: () => { 
+            clearHighlights(); 
             for(let i=0; i<3; i++) for(let j=0; j<3; j++) getCell(1, i, j).classList.add('tutorial-highlight');
         } 
     },
