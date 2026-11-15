@@ -1,5 +1,5 @@
 /* =========================================================
-   Cubiku Variants v74 — Dark & Paper Light Mode + Tutorial
+   Cubiku Variants v75 — Dark & Paper Light Mode + Tutorial
    ========================================================= */
 
 *, *::before, *::after {
@@ -15,6 +15,7 @@
 :root {
   --bg:             #121212;
   --grid-line:      #2A2A2A;
+  --grid-inner:     var(--grid-line);
   --grid-border:    #444444;
   --border-hover:   #555555;
   --accent-text:    #121212;
@@ -46,6 +47,7 @@
 body[data-mode="light"] {
   --bg:             #FFFFFF;
   --grid-line:      #9CA3AF;
+  --grid-inner:     #1F2937;
   --grid-border:    #1F2937;
   --border-hover:   #6B7280;
   --accent-text:    #FFFFFF;
@@ -308,7 +310,7 @@ body[data-mode="dark"] .slider::before { background-color: var(--text-primary); 
 .slice-wrapper { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
 .slice-label { font-size: clamp(0.6rem, 1.9vw, 0.78rem); font-weight: 400; color: var(--text-muted); letter-spacing: 0.5px; }
 
-.grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 2px; background: var(--grid-line); border: 3px solid var(--grid-border); border-radius: 6px; padding: 0; width: 100%; aspect-ratio: 1; overflow: hidden; user-select: none; -webkit-user-select: none; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 2px; background: var(--grid-inner); border: 3px solid var(--grid-border); border-radius: 6px; padding: 0; width: 100%; aspect-ratio: 1; overflow: hidden; user-select: none; -webkit-user-select: none; }
 .cell { width: 100%; height: 100%; aspect-ratio: 1; background-color: var(--bg); background-image: none; border: none; outline: none; box-shadow: none; font-family: inherit; font-size: clamp(0.78rem, 3.4vw, 1.35rem); font-weight: 500; color: var(--user-color); cursor: pointer; transition: background-color 0.15s, filter 0.15s, box-shadow 0.15s, color 0.2s; touch-action: manipulation; display: flex; align-items: center; justify-content: center; position: relative; user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }
 .cell:focus { outline: none; }
 
