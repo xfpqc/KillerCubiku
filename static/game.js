@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v74 — Killer 3D Sudoku (Dark & Light Mode + Interactive Tutorial)
+ * Cubiku Variants v105 — Killer 3D Sudoku (Dark & Light Mode + Interactive Tutorial)
  */
 
 let currentVariant = "killer";
@@ -22,12 +22,12 @@ const CAGE_RGB = [
     '170, 185, 200'   /* Platinum Blue-Grey */
 ];
 
-const CAGE_COLORS = CAGE_RGB.map(rgb => `rgba(${rgb}, 0.35)`);
+const CAGE_COLORS = CAGE_RGB.map(rgb => `rgba(${rgb}, 0.50)`);
 
 function getCageBackground(cage) {
     const isLight = currentColorMode === 'light';
-    const alpha = isLight ? 0.24 : 0.35;
-    const base = isLight ? 255 : 18;
+    const alpha = isLight ? 0.24 : 0.50;
+    const base = isLight ? 255 : 26;
 
     let rgbStr = null;
     if (typeof cage.colorIndex === 'number' && CAGE_RGB[cage.colorIndex]) {
@@ -1032,21 +1032,10 @@ function clearHighlights() {
 }
 
 function applyCrosshair(selZ, selRow, selCol) {
-  if(tutorialActive) return; 
-  for (let z = 0; z < 3; z++) {
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 3; c++) {
-        if (r !== selRow && c !== selCol) continue;
-        const el = getCell(z, r, c);
-        if (!el) continue;
-        if (z === selZ && r === selRow && c === selCol) {
-          el.classList.add('active-cell');
-        } else {
-          el.classList.add('constraint-highlight');
-        }
-      }
-    }
-  }
+  if (tutorialActive) return;
+
+  const activeEl = getCell(selZ, selRow, selCol);
+  if (activeEl) activeEl.classList.add('active-cell');
 
   if (cageMap && cageMap[selZ] && cageMap[selZ][selRow] && cageMap[selZ][selRow][selCol]) {
     const cage = cageMap[selZ][selRow][selCol];
