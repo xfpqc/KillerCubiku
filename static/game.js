@@ -6,28 +6,26 @@ let currentVariant = "killer";
 let currentCages = [];
 let cageMap = [];
 
-/* High-contrast, UI-friendly cage colors */
+/* Saturated, untinted jewel tones for dark mode (clean pastels derived in light mode) */
 const CAGE_RGB = [
-    '255, 59, 48',    /* Coral Red (Warm) */
-    '255, 110, 0',    /* Deep Orange */
-    '255, 240, 0',    /* Bright Lemon */
-    '212, 251, 121',  /* Neon Chartreuse */
-    '76, 217, 100',   /* Apple Green */
-    '0, 224, 184',    /* Turquoise */
-    '90, 200, 250',   /* Light Aqua */
-    '0, 122, 255',    /* Bright Azure */
-    '88, 86, 214',    /* Deep Indigo */
-    '175, 82, 222',   /* Amethyst */
-    '255, 0, 150',    /* Shocking Fuchsia */
-    '170, 185, 200'   /* Platinum Blue-Grey */
+    '206, 44, 54',    /* Crimson Red */
+    '208, 92, 20',    /* Vivid Tangerine */
+    '178, 134, 16',   /* Rich Amber Gold */
+    '68, 152, 46',    /* Fresh Leaf */
+    '22, 156, 92',    /* Emerald */
+    '16, 148, 148',   /* Vibrant Teal */
+    '28, 130, 208',   /* Cerulean */
+    '56, 94, 218',    /* Royal Cobalt */
+    '110, 74, 214',   /* Electric Indigo */
+    '164, 58, 202',   /* Vivid Amethyst */
+    '204, 46, 132',   /* Magenta Rose */
+    '76, 116, 158'    /* Steel Blue */
 ];
 
-const CAGE_COLORS = CAGE_RGB.map(rgb => `rgba(${rgb}, 0.50)`);
+const CAGE_COLORS = CAGE_RGB.map(rgb => `rgb(${rgb})`);
 
 function getCageBackground(cage) {
     const isLight = currentColorMode === 'light';
-    const alpha = isLight ? 0.24 : 0.50;
-    const base = isLight ? 255 : 26;
 
     let rgbStr = null;
     if (typeof cage.colorIndex === 'number' && CAGE_RGB[cage.colorIndex]) {
@@ -39,9 +37,16 @@ function getCageBackground(cage) {
 
     if (!rgbStr) return '';
 
+    /* Dark mode: pure unblended color (no dark-grey tint) */
+    if (!isLight) {
+        return `rgb(${rgbStr})`;
+    }
+
+    /* Light mode: clean pastel blend over white */
+    const alpha = 0.25;
     const [r, g, b] = rgbStr.split(',').map(n => {
         const fg = Number(n.trim());
-        return Math.round(fg * alpha + base * (1 - alpha));
+        return Math.round(fg * alpha + 255 * (1 - alpha));
     });
 
     return `rgb(${r}, ${g}, ${b})`;
@@ -107,9 +112,9 @@ function generateCages(solvedGrid, difficulty = 'medium') {
         const start = unassigned.pop();
         
         let targetSize;
-        if (difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;        
-        else if (difficulty === 'hard' || difficulty === 'fiendish') targetSize = Math.floor(Math.random() * 2) + 3;   
-        else targetSize = Math.floor(Math.random() * 2) + 2;                              
+        if (difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;         
+        else if (difficulty === 'hard' || difficulty === 'fiendish') targetSize = Math.floor(Math.random() * 2) + 3;    
+        else targetSize = Math.floor(Math.random() * 2) + 2;                               
 
         const cageCells = [start];
         let sum = solvedGrid[start.z][start.y][start.x];
