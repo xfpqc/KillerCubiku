@@ -43,7 +43,7 @@ function getCageBackground(cage) {
     }
 
     /* Light mode: clean pastel blend over white */
-    const alpha = 0.25;
+    const alpha = 0.31;
     const [r, g, b] = rgbStr.split(',').map(n => {
         const fg = Number(n.trim());
         return Math.round(fg * alpha + 255 * (1 - alpha));
