@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v107 — Killer 3D Sudoku (5-Tier Difficulty: Casual to Fiendish)
+ * Cubiku Variants v108 — Killer 3D Sudoku (Calibrated 5-Tier Human Heuristic)
  */
 
 let currentVariant = "killer";
@@ -121,7 +121,8 @@ function generateCages(solvedGrid, difficulty = 'medium') {
         const start = unassigned.pop();
         
         let targetSize;
-        if (difficulty === 'casual' || difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;
+        if (difficulty === 'casual') targetSize = Math.random() < 0.72 ? 2 : 3;
+        else if (difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;
         else if (difficulty === 'fiendish') targetSize = Math.random() < 0.65 ? 3 : 4;
         else if (difficulty === 'hard') targetSize = Math.floor(Math.random() * 2) + 3;
         else targetSize = Math.floor(Math.random() * 2) + 2;
@@ -225,6 +226,9 @@ const PLANES_45 = (() => {
     return list;
 })();
 
+const Z_PLANES_45 = PLANES_45.filter(p => p.axis === 'z');
+const DEPTH_PLANES_45 = PLANES_45.filter(p => p.axis !== 'z');
+
 const PLANES_90 = (() => {
     const list = [];
     const pairs = [[0, 1], [1, 2], [0, 2]];
@@ -236,6 +240,13 @@ const PLANES_90 = (() => {
     return list;
 })();
 
+const MAGIC_3_CELL_MASKS = {
+    6:  (1 << 0) | (1 << 1) | (1 << 2), /* {1, 2, 3} */
+    7:  (1 << 0) | (1 << 1) | (1 << 3), /* {1, 2, 4} */
+    23: (1 << 5) | (1 << 7) | (1 << 8), /* {6, 8, 9} */
+    24: (1 << 6) | (1 << 7) | (1 << 8)  /* {7, 8, 9} */
+};
+
 function popcount9(mask) {
     let c = 0, m = mask & 0x1ff;
     while (m) { m &= m - 1; c++; }
@@ -245,7 +256,6 @@ function popcount9(mask) {
 /**
  * Finds all valid non-repeating digit assignments to `cells` summing to `targetSum`
  * given each cell's candidate bitmask `cellMasks`.
- * Returns { valid: boolean, allowedMasks: number[], forcedMask: number }.
  */
 function evaluateCageAssignments(cellMasks, targetSum) {
     const k = cellMasks.length;
@@ -314,7 +324,15 @@ function evaluateCageAssignments(cellMasks, targetSum) {
     return { valid: foundAny, allowedMasks, forcedMask: foundAny ? forcedMask : 0 };
 }
 
-function solveLogically(cagesTest, initialClues = null) {
+/**
+ * Human-style forward-chaining logic solver capped at `maxAllowedTier`:
+ * - Tier 0 (Casual):   Grid Naked Singles + Cage Last-Cell Singles (`sum - filled`)
+ * - Tier 1 (Easy):     Flat z-slice Hidden Singles + 2-cell cage combos + unique 3-cell magic sums (6, 7, 23, 24)
+ * - Tier 2 (Medium):   3D depth-plane Hidden Singles (x/y) + general 3/4-cell cage combos + pointing/claiming + pairs
+ * - Tier 3 (Hard):     Planar Rule of 45 (single & dual innies/outies, 1-innie/1-outie deltas)
+ * - Tier 4 (Fiendish): Volumetric Rule of 90 + 3-innie virtual cages + 3D Planar X-Wings
+ */
+function solveLogically(cagesTest, initialClues = null, maxAllowedTier = 4) {
     const grid = emptyGrid();
     const cands = emptyGrid();
     for (let z = 0; z < 3; z++)
@@ -388,6 +406,39 @@ function solveLogically(cagesTest, initialClues = null) {
             }
         }
         return false;
+    }
+
+    function applyHiddenSinglesOnPlanes(planesList, tierLevel, weight) {
+        let localProgress = false;
+        for (const plane of planesList) {
+            let placedMask = 0;
+            for (const c of plane.cells) {
+                const v = grid[c.z][c.y][c.x];
+                if (v > 0) placedMask |= (1 << (v - 1));
+            }
+            for (let d = 1; d <= 9; d++) {
+                const bit = 1 << (d - 1);
+                if (placedMask & bit) continue;
+                let count = 0, targetCell = null;
+                for (const c of plane.cells) {
+                    if (grid[c.z][c.y][c.x] === 0 && (cands[c.z][c.y][c.x] & bit)) {
+                        count++;
+                        targetCell = c;
+                    }
+                }
+                if (count === 0) return { contradiction: true, progress: false };
+                if (count === 1) {
+                    if (!placeDigit(targetCell.z, targetCell.y, targetCell.x, d)) {
+                        return { contradiction: true, progress: false };
+                    }
+                    score += weight;
+                    localProgress = true;
+                }
+            }
+            if (localProgress) break;
+        }
+        if (localProgress) maxTier = Math.max(maxTier, tierLevel);
+        return { contradiction: false, progress: localProgress };
     }
 
     function applyRegionSumDeductions(regionsList, tierLevel, singleWeight, pairWeight, allowThreeInnies) {
@@ -595,7 +646,7 @@ function solveLogically(cagesTest, initialClues = null) {
         progress = false;
         if (hasContradiction()) return { solved: false, maxTier, score, grid, cands };
 
-        // ── TIER 0A: Naked Singles ───────────────────────────────────────
+        // ── TIER 0A: Grid Naked Singles ──────────────────────────────────
         for (let z = 0; z < 3; z++) {
             for (let y = 0; y < 3; y++) {
                 for (let x = 0; x < 3; x++) {
@@ -614,37 +665,105 @@ function solveLogically(cagesTest, initialClues = null) {
         }
         if (progress) continue;
 
-        // ── TIER 0B: Hidden Singles across all 9 orthogonal 3x3 planes ───
-        for (const plane of PLANES_45) {
-            let placedMask = 0;
-            for (const c of plane.cells) {
-                const v = grid[c.z][c.y][c.x];
-                if (v > 0) placedMask |= (1 << (v - 1));
+        // ── TIER 0B: Cage Last-Cell Singles (sum - filled) ───────────────
+        for (const cage of cagesTest) {
+            let currentSum = 0;
+            let emptyCell = null;
+            let emptyCount = 0;
+            for (const c of cage.cells) {
+                const val = grid[c.z][c.y][c.x];
+                if (val > 0) currentSum += val;
+                else { emptyCell = c; emptyCount++; }
             }
-            for (let d = 1; d <= 9; d++) {
-                const bit = 1 << (d - 1);
-                if (placedMask & bit) continue;
-                let count = 0, targetCell = null;
-                for (const c of plane.cells) {
-                    if (grid[c.z][c.y][c.x] === 0 && (cands[c.z][c.y][c.x] & bit)) {
-                        count++;
-                        targetCell = c;
-                    }
+            if (emptyCount === 0) {
+                if (currentSum !== cage.sum) return { solved: false, maxTier, score, grid, cands };
+            } else if (emptyCount === 1) {
+                const needed = cage.sum - currentSum;
+                if (needed < 1 || needed > 9 || !placeDigit(emptyCell.z, emptyCell.y, emptyCell.x, needed)) {
+                    return { solved: false, maxTier, score, grid, cands };
                 }
-                if (count === 0) return { solved: false, maxTier, score, grid, cands };
-                if (count === 1) {
-                    if (!placeDigit(targetCell.z, targetCell.y, targetCell.x, d)) {
-                        return { solved: false, maxTier, score, grid, cands };
-                    }
-                    score += 1;
-                    progress = true;
-                }
+                score += 1;
+                progress = true;
             }
-            if (progress) break;
         }
         if (progress) continue;
 
-        // ── TIER 0C: Candidate-Filtered Cage Combinations ────────────────
+        if (maxAllowedTier < 1) break;
+
+        // ── TIER 1A: Flat z-Slice Hidden Singles (Single 3x3 Grid) ───────
+        const zHidden = applyHiddenSinglesOnPlanes(Z_PLANES_45, 1, 2);
+        if (zHidden.contradiction) return { solved: false, maxTier, score, grid, cands };
+        if (zHidden.progress) { progress = true; continue; }
+
+        // ── TIER 1B: 2-Cell Cage Combinations ────────────────────────────
+        for (const cage of cagesTest) {
+            let currentSum = 0;
+            const emptyCells = [];
+            let placedMask = 0;
+            for (const c of cage.cells) {
+                const val = grid[c.z][c.y][c.x];
+                if (val > 0) { currentSum += val; placedMask |= (1 << (val - 1)); }
+                else emptyCells.push(c);
+            }
+            if (emptyCells.length !== 2) continue;
+
+            const remSum = cage.sum - currentSum;
+            const cellMasks = emptyCells.map(c => cands[c.z][c.y][c.x] & ~placedMask);
+            const evalRes = evaluateCageAssignments(cellMasks, remSum);
+            if (!evalRes.valid) return { solved: false, maxTier, score, grid, cands };
+
+            let changed = false;
+            for (let i = 0; i < 2; i++) {
+                const c = emptyCells[i];
+                const oldM = cands[c.z][c.y][c.x];
+                const newM = oldM & evalRes.allowedMasks[i];
+                if (newM === 0) return { solved: false, maxTier, score, grid, cands };
+                if (newM !== oldM) {
+                    cands[c.z][c.y][c.x] = newM;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                score += 3;
+                maxTier = Math.max(maxTier, 1);
+                progress = true;
+            }
+        }
+        if (progress) continue;
+
+        // ── TIER 1C: Unique 3-Cell Magic Sums (6, 7, 23, 24) ─────────────
+        for (const cage of cagesTest) {
+            if (cage.cells.length !== 3) continue;
+            const magicMask = MAGIC_3_CELL_MASKS[cage.sum];
+            if (!magicMask) continue;
+            if (cage.cells.some(c => grid[c.z][c.y][c.x] !== 0)) continue;
+
+            let changed = false;
+            for (const c of cage.cells) {
+                const oldM = cands[c.z][c.y][c.x];
+                const newM = oldM & magicMask;
+                if (newM === 0) return { solved: false, maxTier, score, grid, cands };
+                if (newM !== oldM) {
+                    cands[c.z][c.y][c.x] = newM;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                score += 3;
+                maxTier = Math.max(maxTier, 1);
+                progress = true;
+            }
+        }
+        if (progress) continue;
+
+        if (maxAllowedTier < 2) break;
+
+        // ── TIER 2A: 3D Orthogonal Depth Hidden Singles (x & y Planes) ───
+        const depthHidden = applyHiddenSinglesOnPlanes(DEPTH_PLANES_45, 2, 4);
+        if (depthHidden.contradiction) return { solved: false, maxTier, score, grid, cands };
+        if (depthHidden.progress) { progress = true; continue; }
+
+        // ── TIER 2B: General Multi-Cell Cage Combinations (3+ Cells) ─────
         for (const cage of cagesTest) {
             let currentSum = 0;
             const emptyCells = [];
@@ -660,10 +779,7 @@ function solveLogically(cagesTest, initialClues = null) {
                     emptyCells.push(c);
                 }
             }
-            if (emptyCells.length === 0) {
-                if (currentSum !== cage.sum) return { solved: false, maxTier, score, grid, cands };
-                continue;
-            }
+            if (emptyCells.length < 3) continue;
 
             const remSum = cage.sum - currentSum;
             const cellMasks = emptyCells.map(c => cands[c.z][c.y][c.x] & ~placedMask);
@@ -682,13 +798,14 @@ function solveLogically(cagesTest, initialClues = null) {
                 }
             }
             if (cageChanged) {
-                score += 2;
+                score += 5;
+                maxTier = Math.max(maxTier, 2);
                 progress = true;
             }
         }
         if (progress) continue;
 
-        // ── TIER 1A: Sound Cage-to-Plane Pointing (Forced Cage Digits) ───
+        // ── TIER 2C: Sound Cage-to-Plane Pointing (Forced Cage Digits) ───
         for (const cage of cagesTest) {
             let currentSum = 0;
             const emptyCells = [];
@@ -751,13 +868,13 @@ function solveLogically(cagesTest, initialClues = null) {
             }
             if (progress) {
                 score += 6;
-                maxTier = Math.max(maxTier, 1);
+                maxTier = Math.max(maxTier, 2);
                 break;
             }
         }
         if (progress) continue;
 
-        // ── TIER 1B: 3D Plane-to-Line Intersection (Claiming) ────────────
+        // ── TIER 2D: 3D Plane-to-Line Intersection (Claiming) ────────────
         for (const plane of PLANES_45) {
             for (let d = 1; d <= 9; d++) {
                 const bit = 1 << (d - 1);
@@ -820,13 +937,13 @@ function solveLogically(cagesTest, initialClues = null) {
             }
             if (progress) {
                 score += 6;
-                maxTier = Math.max(maxTier, 1);
+                maxTier = Math.max(maxTier, 2);
                 break;
             }
         }
         if (progress) continue;
 
-        // ── TIER 1C: Naked Pairs & Hidden Pairs in Planes ────────────────
+        // ── TIER 2E: Naked Pairs & Hidden Pairs in Planes ────────────────
         for (const plane of PLANES_45) {
             const empties = plane.cells.filter(c => grid[c.z][c.y][c.x] === 0);
             if (empties.length < 3) continue;
@@ -852,7 +969,7 @@ function solveLogically(cagesTest, initialClues = null) {
             }
             if (progress) {
                 score += 6;
-                maxTier = Math.max(maxTier, 1);
+                maxTier = Math.max(maxTier, 2);
                 break;
             }
 
@@ -878,37 +995,41 @@ function solveLogically(cagesTest, initialClues = null) {
             }
             if (progress) {
                 score += 7;
-                maxTier = Math.max(maxTier, 1);
+                maxTier = Math.max(maxTier, 2);
                 break;
             }
         }
         if (progress) continue;
 
-        // ── TIER 2: Planar Rule of 45 (Single & Dual Innies/Outies) ──────
-        const res45 = applyRegionSumDeductions(PLANES_45, 2, 14, 12, false);
+        if (maxAllowedTier < 3) break;
+
+        // ── TIER 3: Planar Rule of 45 (Single & Dual Innies/Outies) ──────
+        const res45 = applyRegionSumDeductions(PLANES_45, 3, 14, 12, false);
         if (res45.contradiction) return { solved: false, maxTier, score, grid, cands };
         if (res45.progress) {
             progress = true;
             continue;
         }
 
-        // ── TIER 3A: Volumetric Rule of 90 (All 9 Two-Plane Slabs) ───────
-        const res90 = applyRegionSumDeductions(PLANES_90, 3, 24, 20, false);
+        if (maxAllowedTier < 4) break;
+
+        // ── TIER 4A: Volumetric Rule of 90 (All 9 Two-Plane Slabs) ───────
+        const res90 = applyRegionSumDeductions(PLANES_90, 4, 24, 20, false);
         if (res90.contradiction) return { solved: false, maxTier, score, grid, cands };
         if (res90.progress) {
             progress = true;
             continue;
         }
 
-        // ── TIER 3B: 3-Innie Virtual Cages in 45-Planes ──────────────────
-        const res45Tri = applyRegionSumDeductions(PLANES_45, 3, 24, 22, true);
+        // ── TIER 4B: 3-Innie Virtual Cages in 45-Planes ──────────────────
+        const res45Tri = applyRegionSumDeductions(PLANES_45, 4, 24, 22, true);
         if (res45Tri.contradiction) return { solved: false, maxTier, score, grid, cands };
         if (res45Tri.progress) {
             progress = true;
             continue;
         }
 
-        // ── TIER 3C: Planar 3D X-Wings across all 9 orthogonal planes ────
+        // ── TIER 4C: Planar 3D X-Wings across all 9 orthogonal planes ────
         for (const plane of PLANES_45) {
             const getCellAt = (r, c) => {
                 if (plane.axis === 'z') return { z: plane.idx, y: r, x: c };
@@ -975,7 +1096,7 @@ function solveLogically(cagesTest, initialClues = null) {
             }
             if (progress) {
                 score += 26;
-                maxTier = Math.max(maxTier, 3);
+                maxTier = Math.max(maxTier, 4);
                 break;
             }
         }
@@ -1004,11 +1125,11 @@ function buildCageMap(cages) {
 }
 
 const DIFFICULTY_SPECS = {
-    casual:   { initialClues: 6, maxClues: 8, minTier: 0, maxTier: 0, minScore: 4,   maxScore: 22  },
-    easy:     { initialClues: 3, maxClues: 4, minTier: 0, maxTier: 1, minScore: 15,  maxScore: 45  },
-    medium:   { initialClues: 1, maxClues: 2, minTier: 1, maxTier: 2, minScore: 40,  maxScore: 85  },
-    hard:     { initialClues: 0, maxClues: 1, minTier: 2, maxTier: 3, minScore: 80,  maxScore: 145 },
-    fiendish: { initialClues: 0, maxClues: 0, minTier: 2, maxTier: 3, minScore: 130, maxScore: 999 }
+    casual:   { initialClues: 7, maxClues: 9, minTier: 0, maxTier: 0, minScore: 10,  maxScore: 30  },
+    easy:     { initialClues: 4, maxClues: 5, minTier: 1, maxTier: 1, minScore: 22,  maxScore: 55  },
+    medium:   { initialClues: 2, maxClues: 3, minTier: 2, maxTier: 2, minScore: 45,  maxScore: 95  },
+    hard:     { initialClues: 0, maxClues: 1, minTier: 3, maxTier: 3, minScore: 85,  maxScore: 150 },
+    fiendish: { initialClues: 0, maxClues: 0, minTier: 3, maxTier: 4, minScore: 125, maxScore: 999 }
 };
 
 function formatGeneratedCagesAndClues(solvedGrid, rawCages, targetDiff) {
@@ -1117,15 +1238,15 @@ async function generateGame(targetDiff = currentDifficulty) {
 
         const currentInitialG = copyGrid(initialG);
         const currentClues = [...clues];
-        let logic = solveLogically(actualCages, currentInitialG);
+        let logic = solveLogically(actualCages, currentInitialG, spec.maxTier);
 
-        /* Bottleneck clue injection strictly within target tier clue budget */
+        /* Bottleneck clue injection strictly within target tier clue & technique budget */
         while (!logic.solved && currentClues.length < spec.maxClues) {
             const target = pickBottleneckCell(logic, currentInitialG);
             if (!target) break;
             currentInitialG[target.z][target.y][target.x] = grid[target.z][target.y][target.x];
             currentClues.push(`${target.z},${target.y},${target.x}`);
-            logic = solveLogically(actualCages, currentInitialG);
+            logic = solveLogically(actualCages, currentInitialG, spec.maxTier);
         }
 
         if (logic.solved) {
@@ -1146,20 +1267,20 @@ async function generateGame(targetDiff = currentDifficulty) {
 
     if (bestPuzzle) return bestPuzzle;
 
-    // Guaranteed-solvable fallback (still 100% human-solvable with zero guessing)
-    console.warn(`Could not strictly match ${targetDiff} profile within budget. Generating guaranteed human-solvable grid.`);
+    // Guaranteed-solvable fallback strictly capped at spec.maxTier
+    console.warn(`Could not strictly match ${targetDiff} profile within budget. Generating guaranteed ${targetDiff}-capped grid.`);
     const fbGrid = emptyGrid();
     generateSolvedGrid(fbGrid, 3, 'standard');
     const fbRawCages = generateCages(fbGrid, targetDiff);
     const fbData = formatGeneratedCagesAndClues(fbGrid, fbRawCages, targetDiff);
 
-    let fbLogic = solveLogically(fbData.actualCages, fbData.initialG);
+    let fbLogic = solveLogically(fbData.actualCages, fbData.initialG, spec.maxTier);
     while (!fbLogic.solved) {
         const target = pickBottleneckCell(fbLogic, fbData.initialG);
         if (!target) break;
         fbData.initialG[target.z][target.y][target.x] = fbGrid[target.z][target.y][target.x];
         fbData.clues.push(`${target.z},${target.y},${target.x}`);
-        fbLogic = solveLogically(fbData.actualCages, fbData.initialG);
+        fbLogic = solveLogically(fbData.actualCages, fbData.initialG, spec.maxTier);
     }
 
     return {
@@ -1178,12 +1299,13 @@ let boardCache = { casual: [], easy: [], medium: [], hard: [], fiendish: [] };
 let isCaching = false;
 
 function saveCache() {
-    localStorage.setItem('cubiku_killer_cache_v2', JSON.stringify(boardCache));
+    localStorage.setItem('cubiku_killer_cache_v3', JSON.stringify(boardCache));
 }
 
 function loadCache() {
     localStorage.removeItem('cubiku_killer_cache');
-    const saved = localStorage.getItem('cubiku_killer_cache_v2');
+    localStorage.removeItem('cubiku_killer_cache_v2');
+    const saved = localStorage.getItem('cubiku_killer_cache_v3');
     if (saved) {
         try { 
             boardCache = JSON.parse(saved); 
