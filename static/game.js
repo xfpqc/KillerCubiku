@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v105 — Killer 3D Sudoku (Dark & Light Mode + Interactive Tutorial)
+ * Cubiku Variants v106 — Killer 3D Sudoku (Upgraded Human Solver & Difficulty Calibration)
  */
 
 let currentVariant = "killer";
@@ -121,9 +121,10 @@ function generateCages(solvedGrid, difficulty = 'medium') {
         const start = unassigned.pop();
         
         let targetSize;
-        if (difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;          
-        else if (difficulty === 'hard' || difficulty === 'fiendish') targetSize = Math.floor(Math.random() * 2) + 3;    
-        else targetSize = Math.floor(Math.random() * 2) + 2;                                
+        if (difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;
+        else if (difficulty === 'fiendish') targetSize = Math.random() < 0.65 ? 3 : 4;
+        else if (difficulty === 'hard') targetSize = Math.floor(Math.random() * 2) + 3;
+        else targetSize = Math.floor(Math.random() * 2) + 2;
 
         const cageCells = [start];
         let sum = solvedGrid[start.z][start.y][start.x];
@@ -199,45 +200,166 @@ function generateCages(solvedGrid, difficulty = 'medium') {
     return cages;
 }
 
-const COMBOS = {};
-function getCombos(targetSum, numCells, excludeDigits = []) {
-    const key = `${targetSum}-${numCells}-${excludeDigits.sort().join('')}`;
-    if (COMBOS[key]) return COMBOS[key];
-    const results = [];
-    function search(currentSum, currentCombo, startDigit) {
-        if (currentCombo.length === numCells) {
-            if (currentSum === targetSum) results.push([...currentCombo]);
+// ---------------------------------------------------------
+// PRECOMPUTED 3D CUBIKU GEOMETRY FOR HUMAN LOGIC SOLVER
+// ---------------------------------------------------------
+const PLANES_45 = (() => {
+    const list = [];
+    for (let z = 0; z < 3; z++) {
+        const cells = [];
+        for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) cells.push({ z, y, x });
+        list.push({ axis: 'z', idx: z, target: 45, cells });
+    }
+    for (let y = 0; y < 3; y++) {
+        const cells = [];
+        for (let z = 0; z < 3; z++) for (let x = 0; x < 3; x++) cells.push({ z, y, x });
+        list.push({ axis: 'y', idx: y, target: 45, cells });
+    }
+    for (let x = 0; x < 3; x++) {
+        const cells = [];
+        for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) cells.push({ z, y, x });
+        list.push({ axis: 'x', idx: x, target: 45, cells });
+    }
+    return list;
+})();
+
+const PLANES_90 = (() => {
+    const list = [];
+    const pairs = [[0, 1], [1, 2], [0, 2]];
+    for (const [a, b] of pairs) {
+        list.push({ target: 90, cells: [...PLANES_45[a].cells, ...PLANES_45[b].cells] });
+        list.push({ target: 90, cells: [...PLANES_45[3 + a].cells, ...PLANES_45[3 + b].cells] });
+        list.push({ target: 90, cells: [...PLANES_45[6 + a].cells, ...PLANES_45[6 + b].cells] });
+    }
+    return list;
+})();
+
+function popcount9(mask) {
+    let c = 0, m = mask & 0x1ff;
+    while (m) { m &= m - 1; c++; }
+    return c;
+}
+
+/**
+ * Finds all valid non-repeating digit assignments to `cells` summing to `targetSum`
+ * given each cell's candidate bitmask `cellMasks`.
+ * Returns { valid: boolean, allowedMasks: number[], forcedMask: number }.
+ */
+function evaluateCageAssignments(cellMasks, targetSum) {
+    const k = cellMasks.length;
+    const allowedMasks = new Array(k).fill(0);
+    let forcedMask = 0x1ff;
+    let foundAny = false;
+
+    // Precompute min/max possible sums of remaining cells for tight branch pruning
+    const minRem = new Array(k + 1).fill(0);
+    const maxRem = new Array(k + 1).fill(0);
+    for (let i = k - 1; i >= 0; i--) {
+        let lo = 10, hi = 0;
+        const m = cellMasks[i];
+        for (let d = 1; d <= 9; d++) {
+            if (m & (1 << (d - 1))) {
+                if (d < lo) lo = d;
+                if (d > hi) hi = d;
+            }
+        }
+        if (lo > hi) return { valid: false, allowedMasks, forcedMask: 0 };
+        minRem[i] = minRem[i + 1] + lo;
+        maxRem[i] = maxRem[i + 1] + hi;
+    }
+
+    const chosen = new Array(k).fill(0);
+
+    function dfs(idx, usedMask, partialSum, comboMask) {
+        if (idx === k) {
+            if (partialSum === targetSum) {
+                foundAny = true;
+                forcedMask &= comboMask;
+                for (let i = 0; i < k; i++) {
+                    allowedMasks[i] |= (1 << (chosen[i] - 1));
+                }
+            }
             return;
         }
-        for (let d = startDigit; d <= 9; d++) {
-            if (!excludeDigits.includes(d) && currentSum + d <= targetSum) {
-                currentCombo.push(d);
-                search(currentSum + d, currentCombo, d + 1);
-                currentCombo.pop();
+        if (partialSum + minRem[idx] > targetSum || partialSum + maxRem[idx] < targetSum) return;
+
+        if (idx === k - 1) {
+            const needed = targetSum - partialSum;
+            if (needed >= 1 && needed <= 9) {
+                const bit = 1 << (needed - 1);
+                if (!(usedMask & bit) && (cellMasks[idx] & bit)) {
+                    chosen[idx] = needed;
+                    foundAny = true;
+                    forcedMask &= (comboMask | bit);
+                    for (let i = 0; i < k; i++) {
+                        allowedMasks[i] |= (1 << (chosen[i] - 1));
+                    }
+                }
+            }
+            return;
+        }
+
+        const avail = cellMasks[idx] & ~usedMask;
+        for (let d = 1; d <= 9; d++) {
+            const bit = 1 << (d - 1);
+            if (avail & bit) {
+                chosen[idx] = d;
+                dfs(idx + 1, usedMask | bit, partialSum + d, comboMask | bit);
             }
         }
     }
-    search(0, [], 1);
-    COMBOS[key] = results;
-    return results;
+
+    dfs(0, 0, 0, 0);
+    return { valid: foundAny, allowedMasks, forcedMask: foundAny ? forcedMask : 0 };
 }
 
 function solveLogically(cagesTest, initialClues = null) {
     const grid = emptyGrid();
     const cands = emptyGrid();
-    for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) cands[z][y][x] = (1 << 9) - 1; 
+    for (let z = 0; z < 3; z++)
+        for (let y = 0; y < 3; y++)
+            for (let x = 0; x < 3; x++)
+                cands[z][y][x] = 0x1ff;
+
+    const localCageMap = buildCageMap(cagesTest);
+    const cellCageId = emptyGrid();
+    for (let z = 0; z < 3; z++)
+        for (let y = 0; y < 3; y++)
+            for (let x = 0; x < 3; x++)
+                cellCageId[z][y][x] = localCageMap[z][y][x] ? localCageMap[z][y][x].id : -1;
+
+    function sharesPeerOrCage(a, b) {
+        if (a.z === b.z || a.y === b.y || a.x === b.x) return true;
+        const idA = cellCageId[a.z][a.y][a.x];
+        return idA !== -1 && idA === cellCageId[b.z][b.y][b.x];
+    }
 
     let progress = true;
     let maxTier = 0;
+    let score = 0;
 
     function placeDigit(z, y, x, d) {
         if (grid[z][y][x] !== 0) return grid[z][y][x] === d;
+        const bit = 1 << (d - 1);
+        if (!(cands[z][y][x] & bit)) return false;
+
         grid[z][y][x] = d;
         cands[z][y][x] = 0;
-        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
-            cands[z][i][j] &= ~(1 << (d - 1));
-            cands[i][y][j] &= ~(1 << (d - 1));
-            cands[i][j][x] &= ~(1 << (d - 1));
+
+        for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+                cands[z][i][j] &= ~bit;
+                cands[i][y][j] &= ~bit;
+                cands[i][j][x] &= ~bit;
+            }
+        }
+        const cage = localCageMap[z][y][x];
+        if (cage) {
+            for (const c of cage.cells) {
+                if (c.z !== z || c.y !== y || c.x !== x) {
+                    cands[c.z][c.y][c.x] &= ~bit;
+                }
+            }
         }
         return true;
     }
@@ -247,152 +369,48 @@ function solveLogically(cagesTest, initialClues = null) {
             for (let y = 0; y < 3; y++) {
                 for (let x = 0; x < 3; x++) {
                     if (initialClues[z][y][x] !== 0) {
-                        if (!placeDigit(z, y, x, initialClues[z][y][x])) return { solved: false, grid };
+                        if (!placeDigit(z, y, x, initialClues[z][y][x])) {
+                            return { solved: false, maxTier: 0, score: 0, grid, cands };
+                        }
                     }
                 }
             }
         }
     }
 
-    const regions = [];
-    for(let z=0; z<3; z++) { let r=[]; for(let y=0; y<3; y++) for(let x=0; x<3; x++) r.push({z,y,x}); regions.push({target: 45, cells: r}); }
-    for(let y=0; y<3; y++) { let r=[]; for(let z=0; z<3; z++) for(let x=0; x<3; x++) r.push({z,y,x}); regions.push({target: 45, cells: r}); }
-    for(let x=0; x<3; x++) { let r=[]; for(let z=0; z<3; z++) for(let y=0; y<3; y++) r.push({z,y,x}); regions.push({target: 45, cells: r}); }
-    
-    regions.push({target: 90, cells: [...regions[0].cells, ...regions[1].cells]});
-    regions.push({target: 90, cells: [...regions[1].cells, ...regions[2].cells]});
-
-    while (progress) {
-        progress = false;
-
-        // TIER 0: Naked Singles
-        for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
-            if (grid[z][y][x] === 0) {
-                let mask = cands[z][y][x];
-                if (mask === 0) return { solved: false, grid }; 
-                if ((mask & (mask - 1)) === 0) {
-                    let d = Math.log2(mask) + 1;
-                    if (!placeDigit(z, y, x, d)) return { solved: false, grid };
-                    progress = true;
+    function hasContradiction() {
+        for (let z = 0; z < 3; z++) {
+            for (let y = 0; y < 3; y++) {
+                for (let x = 0; x < 3; x++) {
+                    if (grid[z][y][x] === 0 && cands[z][y][x] === 0) return true;
                 }
             }
         }
-        if (progress) { maxTier = Math.max(maxTier, 0); continue; }
+        return false;
+    }
 
-        // TIER 0: Cage Combinations
-        for (const cage of cagesTest) {
-            let currentSum = 0;
-            let emptyCells = [];
-            let placedDigits = [];
-            for (const c of cage.cells) {
-                let val = grid[c.z][c.y][c.x];
-                if (val > 0) { currentSum += val; placedDigits.push(val); }
-                else emptyCells.push(c);
-            }
-            if (emptyCells.length === 0) {
-                if (currentSum !== cage.sum) return { solved: false, grid };
-                continue;
-            }
-            let target = cage.sum - currentSum;
-            let combos = getCombos(target, emptyCells.length, placedDigits);
-            if (combos.length === 0) return { solved: false, grid };
+    // Helper for Rule-of-45 and Rule-of-90 innie/outie deductions
+    function applyRegionSumDeductions(regionsList, tierLevel, singleWeight, pairWeight, allowThreeInnies) {
+        let localProgress = false;
 
-            let validMask = 0;
-            for (const combo of combos) for (const d of combo) validMask |= (1 << (d - 1));
-            
-            for (const c of emptyCells) {
-                let oldMask = cands[c.z][c.y][c.x];
-                let newMask = oldMask & validMask;
-                if (newMask !== oldMask) {
-                    cands[c.z][c.y][c.x] = newMask;
-                    progress = true;
-                }
-            }
-        }
-        if (progress) { maxTier = Math.max(maxTier, 0); continue; }
-
-        // TIER 0: Hidden Singles
-        for (let d = 1; d <= 9; d++) {
-            const mask = 1 << (d - 1);
-            for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
-                let count = 0, targetZ = -1;
-                for (let z = 0; z < 3; z++) if (grid[z][y][x] === 0 && (cands[z][y][x] & mask)) { count++; targetZ = z; }
-                if (count === 1 && placeDigit(targetZ, y, x, d)) progress = true;
-            }
-            for (let z = 0; z < 3; z++) for (let x = 0; x < 3; x++) {
-                let count = 0, targetY = -1;
-                for (let y = 0; y < 3; y++) if (grid[z][y][x] === 0 && (cands[z][y][x] & mask)) { count++; targetY = y; }
-                if (count === 1 && placeDigit(z, targetY, x, d)) progress = true;
-            }
-            for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) {
-                let count = 0, targetX = -1;
-                for (let x = 0; x < 3; x++) if (grid[z][y][x] === 0 && (cands[z][y][x] & mask)) { count++; targetX = x; }
-                if (count === 1 && placeDigit(z, y, targetX, d)) progress = true;
-            }
-        }
-        if (progress) { maxTier = Math.max(maxTier, 0); continue; }
-
-        // TIER 1: Pointing Digits
-        for (const cage of cagesTest) {
-            let emptyCells = cage.cells.filter(c => grid[c.z][c.y][c.x] === 0);
-            if (emptyCells.length < 2) continue;
-
-            for (let d = 1; d <= 9; d++) {
-                const mask = 1 << (d - 1);
-                const cellsWithD = emptyCells.filter(c => (cands[c.z][c.y][c.x] & mask));
-                if (cellsWithD.length > 1) {
-                    const shareZ = cellsWithD.every(c => c.z === cellsWithD[0].z);
-                    const shareY = cellsWithD.every(c => c.y === cellsWithD[0].y);
-                    const shareX = cellsWithD.every(c => c.x === cellsWithD[0].x);
-
-                    if (shareZ && shareY) {
-                        for (let x = 0; x < 3; x++) {
-                            if (!cellsWithD.some(c => c.x === x) && grid[cellsWithD[0].z][cellsWithD[0].y][x] === 0) {
-                                if (cands[cellsWithD[0].z][cellsWithD[0].y][x] & mask) {
-                                    cands[cellsWithD[0].z][cellsWithD[0].y][x] &= ~mask; progress = true;
-                                }
-                            }
-                        }
-                    }
-                    if (shareZ && shareX) { 
-                        for (let y = 0; y < 3; y++) {
-                            if (!cellsWithD.some(c => c.y === y) && grid[cellsWithD[0].z][y][cellsWithD[0].x] === 0) {
-                                if (cands[cellsWithD[0].z][y][cellsWithD[0].x] & mask) {
-                                    cands[cellsWithD[0].z][y][cellsWithD[0].x] &= ~mask; progress = true;
-                                }
-                            }
-                        }
-                    }
-                    if (shareY && shareX) { 
-                        for (let z = 0; z < 3; z++) {
-                            if (!cellsWithD.some(c => c.z === z) && grid[z][cellsWithD[0].y][cellsWithD[0].x] === 0) {
-                                if (cands[z][cellsWithD[0].y][cellsWithD[0].x] & mask) {
-                                    cands[z][cellsWithD[0].y][cellsWithD[0].x] &= ~mask; progress = true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (progress) { maxTier = Math.max(maxTier, 1); continue; }
-
-        // TIER 2: Planar 45 and Volumetric 90
-        for (const region of regions) {
+        for (const region of regionsList) {
             const intersectingCages = [];
             const regionStrs = new Set(region.cells.map(c => `${c.z},${c.y},${c.x}`));
             for (const cage of cagesTest) {
-                if (cage.cells.some(c => regionStrs.has(`${c.z},${c.y},${c.x}`))) intersectingCages.push(cage);
+                if (cage.cells.some(c => regionStrs.has(`${c.z},${c.y},${c.x}`))) {
+                    intersectingCages.push(cage);
+                }
             }
-            
-            if (intersectingCages.length > 12) continue; 
-            
-            for (let i = 1; i < (1 << intersectingCages.length); i++) {
+
+            if (intersectingCages.length > 13) continue;
+
+            const totalSubsets = 1 << intersectingCages.length;
+            for (let i = 1; i < totalSubsets; i++) {
                 let subSum = 0;
                 const subStrs = new Set();
                 const subCells = [];
                 for (let j = 0; j < intersectingCages.length; j++) {
-                    if ((i & (1 << j))) {
+                    if (i & (1 << j)) {
                         subSum += intersectingCages[j].sum;
                         for (const c of intersectingCages[j].cells) {
                             subStrs.add(`${c.z},${c.y},${c.x}`);
@@ -400,127 +418,577 @@ function solveLogically(cagesTest, initialClues = null) {
                         }
                     }
                 }
-                
-                if (subSum < region.target - 9 || subSum > region.target + 9) continue;
+
+                if (subSum < region.target - 24 || subSum > region.target + 24) continue;
 
                 const innies = region.cells.filter(c => !subStrs.has(`${c.z},${c.y},${c.x}`));
                 const outies = subCells.filter(c => !regionStrs.has(`${c.z},${c.y},${c.x}`));
 
+                if (innies.length + outies.length > 3) continue;
+
+                // 1. Single Innie
                 if (innies.length === 1 && outies.length === 0) {
-                    let val = region.target - subSum;
-                    let c = innies[0];
-                    if (val >= 1 && val <= 9 && grid[c.z][c.y][c.x] === 0) {
-                        if (placeDigit(c.z, c.y, c.x, val)) progress = true;
+                    const val = region.target - subSum;
+                    const c = innies[0];
+                    if (val < 1 || val > 9) return { contradiction: true, progress: false };
+                    if (grid[c.z][c.y][c.x] === 0) {
+                        if (!placeDigit(c.z, c.y, c.x, val)) return { contradiction: true, progress: false };
+                        score += singleWeight;
+                        localProgress = true;
+                        break;
                     }
-                } else if (outies.length === 1 && innies.length === 0) {
-                    let val = subSum - region.target;
-                    let c = outies[0];
-                    if (val >= 1 && val <= 9 && grid[c.z][c.y][c.x] === 0) {
-                        if (placeDigit(c.z, c.y, c.x, val)) progress = true;
+                }
+                // 2. Single Outie
+                else if (outies.length === 1 && innies.length === 0) {
+                    const val = subSum - region.target;
+                    const c = outies[0];
+                    if (val < 1 || val > 9) return { contradiction: true, progress: false };
+                    if (grid[c.z][c.y][c.x] === 0) {
+                        if (!placeDigit(c.z, c.y, c.x, val)) return { contradiction: true, progress: false };
+                        score += singleWeight;
+                        localProgress = true;
+                        break;
+                    }
+                }
+                // 3. Two Innies (or Two Outies) -> Virtual 2-cell sum
+                else if ((innies.length === 2 && outies.length === 0) || (outies.length === 2 && innies.length === 0)) {
+                    const pair = innies.length === 2 ? innies : outies;
+                    let target = innies.length === 2 ? (region.target - subSum) : (subSum - region.target);
+                    const emptyPair = [];
+                    for (const c of pair) {
+                        if (grid[c.z][c.y][c.x] !== 0) target -= grid[c.z][c.y][c.x];
+                        else emptyPair.push(c);
+                    }
+                    if (emptyPair.length === 0) {
+                        if (target !== 0) return { contradiction: true, progress: false };
+                    } else if (emptyPair.length === 1) {
+                        const c = emptyPair[0];
+                        if (target < 1 || target > 9 || !placeDigit(c.z, c.y, c.x, target)) {
+                            return { contradiction: true, progress: false };
+                        }
+                        score += singleWeight;
+                        localProgress = true;
+                        break;
+                    } else if (emptyPair.length === 2) {
+                        const [c0, c1] = emptyPair;
+                        const mustDistinct = sharesPeerOrCage(c0, c1);
+                        let m0 = 0, m1 = 0;
+                        const cand0 = cands[c0.z][c0.y][c0.x];
+                        const cand1 = cands[c1.z][c1.y][c1.x];
+                        for (let d0 = 1; d0 <= 9; d0++) {
+                            if (!(cand0 & (1 << (d0 - 1)))) continue;
+                            const d1 = target - d0;
+                            if (d1 < 1 || d1 > 9) continue;
+                            if (mustDistinct && d0 === d1) continue;
+                            if (cand1 & (1 << (d1 - 1))) {
+                                m0 |= (1 << (d0 - 1));
+                                m1 |= (1 << (d1 - 1));
+                            }
+                        }
+                        if (m0 === 0 || m1 === 0) return { contradiction: true, progress: false };
+                        const new0 = cand0 & m0;
+                        const new1 = cand1 & m1;
+                        if (new0 !== cand0 || new1 !== cand1) {
+                            cands[c0.z][c0.y][c0.x] = new0;
+                            cands[c1.z][c1.y][c1.x] = new1;
+                            score += pairWeight;
+                            localProgress = true;
+                            break;
+                        }
+                    }
+                }
+                // 4. 1-Innie & 1-Outie: innie - outie = region.target - subSum
+                else if (innies.length === 1 && outies.length === 1) {
+                    const cIn = innies[0], cOut = outies[0];
+                    const delta = region.target - subSum;
+                    const vIn = grid[cIn.z][cIn.y][cIn.x];
+                    const vOut = grid[cOut.z][cOut.y][cOut.x];
+
+                    if (vIn !== 0 && vOut !== 0) {
+                        if (vIn - vOut !== delta) return { contradiction: true, progress: false };
+                    } else if (vIn !== 0) {
+                        const reqOut = vIn - delta;
+                        if (reqOut < 1 || reqOut > 9 || !placeDigit(cOut.z, cOut.y, cOut.x, reqOut)) {
+                            return { contradiction: true, progress: false };
+                        }
+                        score += singleWeight;
+                        localProgress = true;
+                        break;
+                    } else if (vOut !== 0) {
+                        const reqIn = vOut + delta;
+                        if (reqIn < 1 || reqIn > 9 || !placeDigit(cIn.z, cIn.y, cIn.x, reqIn)) {
+                            return { contradiction: true, progress: false };
+                        }
+                        score += singleWeight;
+                        localProgress = true;
+                        break;
+                    } else {
+                        const mustDistinct = sharesPeerOrCage(cIn, cOut);
+                        const candIn = cands[cIn.z][cIn.y][cIn.x];
+                        const candOut = cands[cOut.z][cOut.y][cOut.x];
+                        let mIn = 0, mOut = 0;
+                        for (let dIn = 1; dIn <= 9; dIn++) {
+                            if (!(candIn & (1 << (dIn - 1)))) continue;
+                            const dOut = dIn - delta;
+                            if (dOut < 1 || dOut > 9) continue;
+                            if (mustDistinct && dIn === dOut) continue;
+                            if (candOut & (1 << (dOut - 1))) {
+                                mIn |= (1 << (dIn - 1));
+                                mOut |= (1 << (dOut - 1));
+                            }
+                        }
+                        if (mIn === 0 || mOut === 0) return { contradiction: true, progress: false };
+                        const newIn = candIn & mIn;
+                        const newOut = candOut & mOut;
+                        if (newIn !== candIn || newOut !== candOut) {
+                            cands[cIn.z][cIn.y][cIn.x] = newIn;
+                            cands[cOut.z][cOut.y][cOut.x] = newOut;
+                            score += pairWeight;
+                            localProgress = true;
+                            break;
+                        }
+                    }
+                }
+                // 5. Three Innies inside a single 45-plane -> Virtual 3-cell cage
+                else if (allowThreeInnies && innies.length === 3 && outies.length === 0) {
+                    let remTarget = region.target - subSum;
+                    const emptyTri = [];
+                    let usedBits = 0;
+                    for (const c of innies) {
+                        const v = grid[c.z][c.y][c.x];
+                        if (v !== 0) {
+                            remTarget -= v;
+                            usedBits |= (1 << (v - 1));
+                        } else {
+                            emptyTri.push(c);
+                        }
+                    }
+                    if (emptyTri.length >= 2) {
+                        const triMasks = emptyTri.map(c => cands[c.z][c.y][c.x] & ~usedBits);
+                        const evalRes = evaluateCageAssignments(triMasks, remTarget);
+                        if (!evalRes.valid) return { contradiction: true, progress: false };
+                        let changed = false;
+                        for (let idx = 0; idx < emptyTri.length; idx++) {
+                            const c = emptyTri[idx];
+                            const oldM = cands[c.z][c.y][c.x];
+                            const newM = oldM & evalRes.allowedMasks[idx];
+                            if (newM !== oldM) {
+                                cands[c.z][c.y][c.x] = newM;
+                                changed = true;
+                            }
+                        }
+                        if (changed) {
+                            score += pairWeight;
+                            localProgress = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (localProgress) break;
+        }
+        if (localProgress) maxTier = Math.max(maxTier, tierLevel);
+        return { contradiction: false, progress: localProgress };
+    }
+
+    while (progress) {
+        progress = false;
+        if (hasContradiction()) return { solved: false, maxTier, score, grid, cands };
+
+        // ── TIER 0A: Naked Singles ───────────────────────────────────────
+        for (let z = 0; z < 3; z++) {
+            for (let y = 0; y < 3; y++) {
+                for (let x = 0; x < 3; x++) {
+                    if (grid[z][y][x] === 0) {
+                        const mask = cands[z][y][x];
+                        if (mask === 0) return { solved: false, maxTier, score, grid, cands };
+                        if ((mask & (mask - 1)) === 0) {
+                            const d = Math.log2(mask) + 1;
+                            if (!placeDigit(z, y, x, d)) return { solved: false, maxTier, score, grid, cands };
+                            score += 1;
+                            progress = true;
+                        }
+                    }
+                }
+            }
+        }
+        if (progress) continue;
+
+        // ── TIER 0B: Hidden Singles across all 9 orthogonal 3x3 planes ───
+        for (const plane of PLANES_45) {
+            let placedMask = 0;
+            for (const c of plane.cells) {
+                const v = grid[c.z][c.y][c.x];
+                if (v > 0) placedMask |= (1 << (v - 1));
+            }
+            for (let d = 1; d <= 9; d++) {
+                const bit = 1 << (d - 1);
+                if (placedMask & bit) continue;
+                let count = 0, targetCell = null;
+                for (const c of plane.cells) {
+                    if (grid[c.z][c.y][c.x] === 0 && (cands[c.z][c.y][c.x] & bit)) {
+                        count++;
+                        targetCell = c;
+                    }
+                }
+                if (count === 0) return { solved: false, maxTier, score, grid, cands };
+                if (count === 1) {
+                    if (!placeDigit(targetCell.z, targetCell.y, targetCell.x, d)) {
+                        return { solved: false, maxTier, score, grid, cands };
+                    }
+                    score += 1;
+                    progress = true;
+                }
+            }
+            if (progress) break;
+        }
+        if (progress) continue;
+
+        // ── TIER 0C: Candidate-Filtered Cage Combinations ────────────────
+        for (const cage of cagesTest) {
+            let currentSum = 0;
+            const emptyCells = [];
+            let placedMask = 0;
+            for (const c of cage.cells) {
+                const val = grid[c.z][c.y][c.x];
+                if (val > 0) {
+                    const bit = 1 << (val - 1);
+                    if (placedMask & bit) return { solved: false, maxTier, score, grid, cands };
+                    placedMask |= bit;
+                    currentSum += val;
+                } else {
+                    emptyCells.push(c);
+                }
+            }
+            if (emptyCells.length === 0) {
+                if (currentSum !== cage.sum) return { solved: false, maxTier, score, grid, cands };
+                continue;
+            }
+
+            const remSum = cage.sum - currentSum;
+            const cellMasks = emptyCells.map(c => cands[c.z][c.y][c.x] & ~placedMask);
+            const evalRes = evaluateCageAssignments(cellMasks, remSum);
+            if (!evalRes.valid) return { solved: false, maxTier, score, grid, cands };
+
+            let cageChanged = false;
+            for (let i = 0; i < emptyCells.length; i++) {
+                const c = emptyCells[i];
+                const oldMask = cands[c.z][c.y][c.x];
+                const newMask = oldMask & evalRes.allowedMasks[i];
+                if (newMask === 0) return { solved: false, maxTier, score, grid, cands };
+                if (newMask !== oldMask) {
+                    cands[c.z][c.y][c.x] = newMask;
+                    cageChanged = true;
+                }
+            }
+            if (cageChanged) {
+                score += 2;
+                progress = true;
+            }
+        }
+        if (progress) continue;
+
+        // ── TIER 1A: Sound Cage-to-Plane Pointing (Forced Cage Digits) ───
+        for (const cage of cagesTest) {
+            let currentSum = 0;
+            const emptyCells = [];
+            let placedMask = 0;
+            for (const c of cage.cells) {
+                const val = grid[c.z][c.y][c.x];
+                if (val > 0) { currentSum += val; placedMask |= (1 << (val - 1)); }
+                else emptyCells.push(c);
+            }
+            if (emptyCells.length < 2) continue;
+
+            const cellMasks = emptyCells.map(c => cands[c.z][c.y][c.x] & ~placedMask);
+            const evalRes = evaluateCageAssignments(cellMasks, cage.sum - currentSum);
+            if (!evalRes.valid) return { solved: false, maxTier, score, grid, cands };
+
+            for (let d = 1; d <= 9; d++) {
+                const bit = 1 << (d - 1);
+                if (!(evalRes.forcedMask & bit)) continue; // Only digits guaranteed in the cage can point out!
+
+                const cellsWithD = emptyCells.filter(c => (cands[c.z][c.y][c.x] & bit));
+                if (cellsWithD.length < 2) continue;
+
+                const shareZ = cellsWithD.every(c => c.z === cellsWithD[0].z);
+                const shareY = cellsWithD.every(c => c.y === cellsWithD[0].y);
+                const shareX = cellsWithD.every(c => c.x === cellsWithD[0].x);
+
+                if (shareZ) {
+                    const pz = cellsWithD[0].z;
+                    for (let y = 0; y < 3; y++) {
+                        for (let x = 0; x < 3; x++) {
+                            if (!cellsWithD.some(c => c.y === y && c.x === x) && grid[pz][y][x] === 0 && (cands[pz][y][x] & bit)) {
+                                cands[pz][y][x] &= ~bit;
+                                progress = true;
+                            }
+                        }
+                    }
+                }
+                if (shareY) {
+                    const py = cellsWithD[0].y;
+                    for (let z = 0; z < 3; z++) {
+                        for (let x = 0; x < 3; x++) {
+                            if (!cellsWithD.some(c => c.z === z && c.x === x) && grid[z][py][x] === 0 && (cands[z][py][x] & bit)) {
+                                cands[z][py][x] &= ~bit;
+                                progress = true;
+                            }
+                        }
+                    }
+                }
+                if (shareX) {
+                    const px = cellsWithD[0].x;
+                    for (let z = 0; z < 3; z++) {
+                        for (let y = 0; y < 3; y++) {
+                            if (!cellsWithD.some(c => c.z === z && c.y === y) && grid[z][y][px] === 0 && (cands[z][y][px] & bit)) {
+                                cands[z][y][px] &= ~bit;
+                                progress = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if (progress) {
+                score += 6;
+                maxTier = Math.max(maxTier, 1);
+                break;
+            }
+        }
+        if (progress) continue;
+
+        // ── TIER 1B: 3D Plane-to-Line Intersection (Claiming) ────────────
+        for (const plane of PLANES_45) {
+            for (let d = 1; d <= 9; d++) {
+                const bit = 1 << (d - 1);
+                const cellsWithD = plane.cells.filter(c => grid[c.z][c.y][c.x] === 0 && (cands[c.z][c.y][c.x] & bit));
+                if (cellsWithD.length < 2) continue;
+
+                if (plane.axis === 'z') {
+                    if (cellsWithD.every(c => c.y === cellsWithD[0].y)) {
+                        const py = cellsWithD[0].y;
+                        for (let z = 0; z < 3; z++) if (z !== plane.idx) {
+                            for (let x = 0; x < 3; x++) if (grid[z][py][x] === 0 && (cands[z][py][x] & bit)) {
+                                cands[z][py][x] &= ~bit; progress = true;
+                            }
+                        }
+                    }
+                    if (cellsWithD.every(c => c.x === cellsWithD[0].x)) {
+                        const px = cellsWithD[0].x;
+                        for (let z = 0; z < 3; z++) if (z !== plane.idx) {
+                            for (let y = 0; y < 3; y++) if (grid[z][y][px] === 0 && (cands[z][y][px] & bit)) {
+                                cands[z][y][px] &= ~bit; progress = true;
+                            }
+                        }
+                    }
+                } else if (plane.axis === 'y') {
+                    if (cellsWithD.every(c => c.z === cellsWithD[0].z)) {
+                        const pz = cellsWithD[0].z;
+                        for (let y = 0; y < 3; y++) if (y !== plane.idx) {
+                            for (let x = 0; x < 3; x++) if (grid[pz][y][x] === 0 && (cands[pz][y][x] & bit)) {
+                                cands[pz][y][x] &= ~bit; progress = true;
+                            }
+                        }
+                    }
+                    if (cellsWithD.every(c => c.x === cellsWithD[0].x)) {
+                        const px = cellsWithD[0].x;
+                        for (let y = 0; y < 3; y++) if (y !== plane.idx) {
+                            for (let z = 0; z < 3; z++) if (grid[z][y][px] === 0 && (cands[z][y][px] & bit)) {
+                                cands[z][y][px] &= ~bit; progress = true;
+                            }
+                        }
+                    }
+                } else if (plane.axis === 'x') {
+                    if (cellsWithD.every(c => c.z === cellsWithD[0].z)) {
+                        const pz = cellsWithD[0].z;
+                        for (let x = 0; x < 3; x++) if (x !== plane.idx) {
+                            for (let y = 0; y < 3; y++) if (grid[pz][y][x] === 0 && (cands[pz][y][x] & bit)) {
+                                cands[pz][y][x] &= ~bit; progress = true;
+                            }
+                        }
+                    }
+                    if (cellsWithD.every(c => c.y === cellsWithD[0].y)) {
+                        const py = cellsWithD[0].y;
+                        for (let x = 0; x < 3; x++) if (x !== plane.idx) {
+                            for (let z = 0; z < 3; z++) if (grid[z][py][x] === 0 && (cands[z][py][x] & bit)) {
+                                cands[z][py][x] &= ~bit; progress = true;
+                            }
+                        }
                     }
                 }
                 if (progress) break;
             }
-            if (progress) break;
+            if (progress) {
+                score += 6;
+                maxTier = Math.max(maxTier, 1);
+                break;
+            }
         }
-        
-        if (progress) { maxTier = Math.max(maxTier, 2); continue; }
+        if (progress) continue;
 
-        // TIER 3: Advanced Cage Intersections (Forced Digits)
-        for (const cage of cagesTest) {
-            let currentSum = 0;
-            let emptyCells = [];
-            let placedDigits = [];
-            for (const c of cage.cells) {
-                let val = grid[c.z][c.y][c.x];
-                if (val > 0) { currentSum += val; placedDigits.push(val); }
-                else emptyCells.push(c);
-            }
-            if (emptyCells.length < 2) continue;
-            let target = cage.sum - currentSum;
-            let combos = getCombos(target, emptyCells.length, placedDigits);
-            if (combos.length === 0) continue;
+        // ── TIER 1C: Naked Pairs & Hidden Pairs in Planes ────────────────
+        for (const plane of PLANES_45) {
+            const empties = plane.cells.filter(c => grid[c.z][c.y][c.x] === 0);
+            if (empties.length < 3) continue;
 
-            let forcedMask = (1 << 9) - 1;
-            for (const combo of combos) {
-                let cm = 0;
-                for (const d of combo) cm |= (1 << (d - 1));
-                forcedMask &= cm;
+            // Naked Pairs
+            for (let i = 0; i < empties.length - 1; i++) {
+                const m1 = cands[empties[i].z][empties[i].y][empties[i].x];
+                if (popcount9(m1) !== 2) continue;
+                for (let j = i + 1; j < empties.length; j++) {
+                    const m2 = cands[empties[j].z][empties[j].y][empties[j].x];
+                    if (m1 === m2) {
+                        for (let k = 0; k < empties.length; k++) {
+                            if (k === i || k === j) continue;
+                            const ck = empties[k];
+                            const oldM = cands[ck.z][ck.y][ck.x];
+                            if (oldM & m1) {
+                                cands[ck.z][ck.y][ck.x] = oldM & ~m1;
+                                progress = true;
+                            }
+                        }
+                    }
+                }
             }
-            
+            if (progress) {
+                score += 6;
+                maxTier = Math.max(maxTier, 1);
+                break;
+            }
+
+            // Hidden Pairs
+            for (let d1 = 1; d1 <= 8; d1++) {
+                const b1 = 1 << (d1 - 1);
+                const cells1 = empties.filter(c => cands[c.z][c.y][c.x] & b1);
+                if (cells1.length !== 2) continue;
+                for (let d2 = d1 + 1; d2 <= 9; d2++) {
+                    const b2 = 1 << (d2 - 1);
+                    const cells2 = empties.filter(c => cands[c.z][c.y][c.x] & b2);
+                    if (cells2.length === 2 && cells1[0] === cells2[0] && cells1[1] === cells2[1]) {
+                        const pairMask = b1 | b2;
+                        for (const c of cells1) {
+                            const oldM = cands[c.z][c.y][c.x];
+                            if (oldM !== pairMask) {
+                                cands[c.z][c.y][c.x] = pairMask;
+                                progress = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if (progress) {
+                score += 7;
+                maxTier = Math.max(maxTier, 1);
+                break;
+            }
+        }
+        if (progress) continue;
+
+        // ── TIER 2: Planar Rule of 45 (Single & Dual Innies/Outies) ──────
+        const res45 = applyRegionSumDeductions(PLANES_45, 2, 14, 12, false);
+        if (res45.contradiction) return { solved: false, maxTier, score, grid, cands };
+        if (res45.progress) {
+            progress = true;
+            continue;
+        }
+
+        // ── TIER 3A: Volumetric Rule of 90 (All 9 Two-Plane Slabs) ───────
+        const res90 = applyRegionSumDeductions(PLANES_90, 3, 24, 20, false);
+        if (res90.contradiction) return { solved: false, maxTier, score, grid, cands };
+        if (res90.progress) {
+            progress = true;
+            continue;
+        }
+
+        // ── TIER 3B: 3-Innie Virtual Cages in 45-Planes ──────────────────
+        const res45Tri = applyRegionSumDeductions(PLANES_45, 3, 24, 22, true);
+        if (res45Tri.contradiction) return { solved: false, maxTier, score, grid, cands };
+        if (res45Tri.progress) {
+            progress = true;
+            continue;
+        }
+
+        // ── TIER 3C: Planar 3D X-Wings across all 9 orthogonal planes ────
+        for (const plane of PLANES_45) {
+            const getCellAt = (r, c) => {
+                if (plane.axis === 'z') return { z: plane.idx, y: r, x: c };
+                if (plane.axis === 'y') return { z: r, y: plane.idx, x: c };
+                return { z: r, y: c, x: plane.idx };
+            };
+
             for (let d = 1; d <= 9; d++) {
-                const mask = 1 << (d - 1);
-                if (forcedMask & mask) {
-                    const cellsWithD = emptyCells.filter(c => (cands[c.z][c.y][c.x] & mask));
-                    if (cellsWithD.length > 1) {
-                        const shareZ = cellsWithD.every(c => c.z === cellsWithD[0].z);
-                        const shareY = cellsWithD.every(c => c.y === cellsWithD[0].y);
-                        const shareX = cellsWithD.every(c => c.x === cellsWithD[0].x);
+                const bit = 1 << (d - 1);
 
-                        if (shareZ && shareY) {
-                            for (let x = 0; x < 3; x++) {
-                                if (!cellsWithD.some(c => c.x === x) && grid[cellsWithD[0].z][cellsWithD[0].y][x] === 0) {
-                                    if (cands[cellsWithD[0].z][cellsWithD[0].y][x] & mask) {
-                                        cands[cellsWithD[0].z][cellsWithD[0].y][x] &= ~mask; progress = true;
-                                    }
-                                }
-                            }
+                // Row-based X-Wing
+                const rowPairs = [];
+                for (let r = 0; r < 3; r++) {
+                    const cols = [];
+                    for (let c = 0; c < 3; c++) {
+                        const cell = getCellAt(r, c);
+                        if (grid[cell.z][cell.y][cell.x] === 0 && (cands[cell.z][cell.y][cell.x] & bit)) {
+                            cols.push(c);
                         }
-                        if (shareZ && shareX) {
-                            for (let y = 0; y < 3; y++) {
-                                if (!cellsWithD.some(c => c.y === y) && grid[cellsWithD[0].z][y][cellsWithD[0].x] === 0) {
-                                    if (cands[cellsWithD[0].z][y][cellsWithD[0].x] & mask) {
-                                        cands[cellsWithD[0].z][y][cellsWithD[0].x] &= ~mask; progress = true;
-                                    }
-                                }
-                            }
-                        }
-                        if (shareY && shareX) {
-                            for (let z = 0; z < 3; z++) {
-                                if (!cellsWithD.some(c => c.z === z) && grid[z][cellsWithD[0].y][cellsWithD[0].x] === 0) {
-                                    if (cands[z][cellsWithD[0].y][cellsWithD[0].x] & mask) {
-                                        cands[z][cellsWithD[0].y][cellsWithD[0].x] &= ~mask; progress = true;
-                                    }
-                                }
+                    }
+                    if (cols.length === 2) rowPairs.push({ r, cols });
+                }
+                if (rowPairs.length === 2 && rowPairs[0].cols[0] === rowPairs[1].cols[0] && rowPairs[0].cols[1] === rowPairs[1].cols[1]) {
+                    const c1 = rowPairs[0].cols[0], c2 = rowPairs[0].cols[1];
+                    for (let r = 0; r < 3; r++) {
+                        if (r === rowPairs[0].r || r === rowPairs[1].r) continue;
+                        for (const col of [c1, c2]) {
+                            const target = getCellAt(r, col);
+                            if (grid[target.z][target.y][target.x] === 0 && (cands[target.z][target.y][target.x] & bit)) {
+                                cands[target.z][target.y][target.x] &= ~bit;
+                                progress = true;
                             }
                         }
                     }
                 }
-            }
-        }
-        if (progress) { maxTier = Math.max(maxTier, 3); continue; }
 
-        // TIER 3: Planar 3D X-Wings
-        for (let d = 1; d <= 9; d++) {
-            const mask = 1 << (d - 1);
-            for (let z = 0; z < 3; z++) {
-                let rowP = [];
-                for (let y = 0; y < 3; y++) {
-                    let cols = [];
-                    for (let x = 0; x < 3; x++) if (grid[z][y][x] === 0 && (cands[z][y][x] & mask)) cols.push(x);
-                    if (cols.length === 2) rowP.push({y, cols});
+                // Col-based X-Wing
+                const colPairs = [];
+                for (let c = 0; c < 3; c++) {
+                    const rows = [];
+                    for (let r = 0; r < 3; r++) {
+                        const cell = getCellAt(r, c);
+                        if (grid[cell.z][cell.y][cell.x] === 0 && (cands[cell.z][cell.y][cell.x] & bit)) {
+                            rows.push(r);
+                        }
+                    }
+                    if (rows.length === 2) colPairs.push({ c, rows });
                 }
-                if (rowP.length === 2 && rowP[0].cols[0] === rowP[1].cols[0] && rowP[0].cols[1] === rowP[1].cols[1]) {
-                    const c1 = rowP[0].cols[0], c2 = rowP[0].cols[1];
-                    for (let y = 0; y < 3; y++) {
-                        if (y !== rowP[0].y && y !== rowP[1].y) {
-                            if (grid[z][y][c1] === 0 && (cands[z][y][c1] & mask)) { cands[z][y][c1] &= ~mask; progress = true; }
-                            if (grid[z][y][c2] === 0 && (cands[z][y][c2] & mask)) { cands[z][y][c2] &= ~mask; progress = true; }
+                if (colPairs.length === 2 && colPairs[0].rows[0] === colPairs[1].rows[0] && colPairs[0].rows[1] === colPairs[1].rows[1]) {
+                    const r1 = colPairs[0].rows[0], r2 = colPairs[0].rows[1];
+                    for (let c = 0; c < 3; c++) {
+                        if (c === colPairs[0].c || c === colPairs[1].c) continue;
+                        for (const row of [r1, r2]) {
+                            const target = getCellAt(row, c);
+                            if (grid[target.z][target.y][target.x] === 0 && (cands[target.z][target.y][target.x] & bit)) {
+                                cands[target.z][target.y][target.x] &= ~bit;
+                                progress = true;
+                            }
                         }
                     }
                 }
+
+                if (progress) break;
             }
-            if (progress) break; 
+            if (progress) {
+                score += 26;
+                maxTier = Math.max(maxTier, 3);
+                break;
+            }
         }
-        if (progress) { maxTier = Math.max(maxTier, 3); continue; }
+        if (progress) continue;
     }
 
     let isSolved = true;
-    for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
-        if (grid[z][y][x] === 0) isSolved = false;
-    }
+    for (let z = 0; z < 3; z++)
+        for (let y = 0; y < 3; y++)
+            for (let x = 0; x < 3; x++)
+                if (grid[z][y][x] === 0) isSolved = false;
 
-    return { solved: isSolved, maxTier, grid };
+    return { solved: isSolved, maxTier, score, grid, cands };
 }
 
 function yieldToMain() {
@@ -535,7 +1003,15 @@ function buildCageMap(cages) {
     return map;
 }
 
+const DIFFICULTY_SPECS = {
+    easy:     { initialClues: 3, maxClues: 4, minTier: 0, maxTier: 1, minScore: 15,  maxScore: 45  },
+    medium:   { initialClues: 1, maxClues: 2, minTier: 1, maxTier: 2, minScore: 40,  maxScore: 85  },
+    hard:     { initialClues: 0, maxClues: 1, minTier: 2, maxTier: 3, minScore: 80,  maxScore: 145 },
+    fiendish: { initialClues: 0, maxClues: 0, minTier: 2, maxTier: 3, minScore: 130, maxScore: 999 }
+};
+
 function formatGeneratedCagesAndClues(solvedGrid, rawCages, targetDiff) {
+    const spec = DIFFICULTY_SPECS[targetDiff] || DIFFICULTY_SPECS.medium;
     const actualCages = [];
     const forcedClues = [];
     
@@ -555,11 +1031,7 @@ function formatGeneratedCagesAndClues(solvedGrid, rawCages, targetDiff) {
         clues.push(`${c.z},${c.y},${c.x}`);
     }
     
-    let targetTotalClues = 0;
-    if (targetDiff === 'easy') targetTotalClues = Math.floor(Math.random() * 3) + 4; 
-    else if (targetDiff === 'medium') targetTotalClues = Math.floor(Math.random() * 2) + 2; 
-
-    let extraNeeded = targetTotalClues - forcedClues.length;
+    const extraNeeded = spec.initialClues - forcedClues.length;
     
     if (extraNeeded > 0) {
         const allCells = [];
@@ -567,13 +1039,13 @@ function formatGeneratedCagesAndClues(solvedGrid, rawCages, targetDiff) {
             for (let y = 0; y < 3; y++) {
                 for (let x = 0; x < 3; x++) {
                     if (!forcedClues.some(fc => fc.z === z && fc.y === y && fc.x === x)) {
-                        allCells.push({z,y,x});
+                        allCells.push({ z, y, x });
                     }
                 }
             }
         }
         shuffleArray(allCells);
-        for(let i = 0; i < extraNeeded && i < allCells.length; i++) {
+        for (let i = 0; i < extraNeeded && i < allCells.length; i++) {
             const c = allCells[i];
             initialG[c.z][c.y][c.x] = solvedGrid[c.z][c.y][c.x];
             clues.push(`${c.z},${c.y},${c.x}`);
@@ -587,76 +1059,119 @@ function copyGrid(grid) {
     return grid.map(z => z.map(y => [...y]));
 }
 
-async function generateGame(targetDiff = currentDifficulty) {
-    let bestPuzzle = null;
-    let lowestCluesNeeded = 999;
-    const diffMap = { 0: 'easy', 1: 'medium', 2: 'hard', 3: 'fiendish' };
+/**
+ * Picks a minimum-candidate bottleneck cell from the stalled solver state
+ * so clue injection unlocks logical chains cleanly without collapsing the grid.
+ */
+function pickBottleneckCell(logicState, currentInitialG) {
+    let minCands = 10;
+    let candidates = [];
 
-    for (let attempts = 0; attempts < 150; attempts++) {
-        if (attempts % 10 === 0) await yieldToMain();
+    for (let z = 0; z < 3; z++) {
+        for (let y = 0; y < 3; y++) {
+            for (let x = 0; x < 3; x++) {
+                if (logicState.grid[z][y][x] === 0 && currentInitialG[z][y][x] === 0) {
+                    const count = logicState.cands ? popcount9(logicState.cands[z][y][x]) : 9;
+                    if (count < minCands) {
+                        minCands = count;
+                        candidates = [{ z, y, x }];
+                    } else if (count === minCands) {
+                        candidates.push({ z, y, x });
+                    }
+                }
+            }
+        }
+    }
+
+    if (candidates.length === 0) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function scoreDifficultyFit(logic, clueCount, spec) {
+    let penalty = 0;
+    if (clueCount > spec.maxClues) penalty += (clueCount - spec.maxClues) * 500;
+    if (logic.maxTier < spec.minTier) penalty += (spec.minTier - logic.maxTier) * 300;
+    if (logic.maxTier > spec.maxTier) penalty += (logic.maxTier - spec.maxTier) * 300;
+    if (logic.score < spec.minScore) penalty += (spec.minScore - logic.score) * 3;
+    if (logic.score > spec.maxScore) penalty += (logic.score - spec.maxScore) * 3;
+    return penalty;
+}
+
+async function generateGame(targetDiff = currentDifficulty) {
+    const spec = DIFFICULTY_SPECS[targetDiff] || DIFFICULTY_SPECS.medium;
+    let bestPuzzle = null;
+    let bestPenalty = Infinity;
+
+    const maxAttempts = targetDiff === 'fiendish' ? 500 : 300;
+    const deadline = performance.now() + (targetDiff === 'fiendish' ? 850 : 500);
+
+    for (let attempts = 0; attempts < maxAttempts; attempts++) {
+        if (attempts > 0 && attempts % 12 === 0) {
+            await yieldToMain();
+            if (bestPuzzle && performance.now() > deadline) break;
+        }
 
         const grid = emptyGrid();
         generateSolvedGrid(grid, 3, 'standard');
         const rawCages = generateCages(grid, targetDiff);
         const { actualCages, initialG, clues } = formatGeneratedCagesAndClues(grid, rawCages, targetDiff);
-        
-        let currentInitialG = copyGrid(initialG);
-        let currentClues = [...clues];
+
+        if (clues.length > spec.maxClues) continue;
+
+        const currentInitialG = copyGrid(initialG);
+        const currentClues = [...clues];
         let logic = solveLogically(actualCages, currentInitialG);
 
-        /* ITERATIVE CLUE INJECTION */
-        while (!logic.solved) {
-            let emptyCells = [];
-            for (let z=0; z<3; z++) for (let y=0; y<3; y++) for (let x=0; x<3; x++) {
-                if (logic.grid[z][y][x] === 0 && currentInitialG[z][y][x] === 0) emptyCells.push({z,y,x});
-            }
-            if (emptyCells.length === 0) break;
-            
-            shuffleArray(emptyCells);
-            let target = emptyCells[0];
+        /* Bottleneck clue injection strictly within target tier clue budget */
+        while (!logic.solved && currentClues.length < spec.maxClues) {
+            const target = pickBottleneckCell(logic, currentInitialG);
+            if (!target) break;
             currentInitialG[target.z][target.y][target.x] = grid[target.z][target.y][target.x];
             currentClues.push(`${target.z},${target.y},${target.x}`);
-            
             logic = solveLogically(actualCages, currentInitialG);
         }
 
         if (logic.solved) {
-            const mappedDiff = diffMap[logic.maxTier] || 'fiendish';
-            if (mappedDiff === targetDiff && currentClues.length < lowestCluesNeeded) {
-                lowestCluesNeeded = currentClues.length;
-                bestPuzzle = { clues: currentClues, initialGrid: currentInitialG, solvedGrid: grid, cages: actualCages, map: buildCageMap(actualCages) };
-                
-                if (targetDiff === 'fiendish' && currentClues.length <= 0) break; 
-                if (targetDiff === 'hard' && currentClues.length <= 2) break;
-                if (targetDiff === 'medium' && currentClues.length <= 4) break;
-                if (targetDiff === 'easy' && currentClues.length <= 8) break;
+            const penalty = scoreDifficultyFit(logic, currentClues.length, spec);
+            if (penalty < bestPenalty) {
+                bestPenalty = penalty;
+                bestPuzzle = {
+                    clues: currentClues,
+                    initialGrid: currentInitialG,
+                    solvedGrid: grid,
+                    cages: actualCages,
+                    map: buildCageMap(actualCages)
+                };
+                if (penalty === 0) break;
             }
         }
     }
-    
+
     if (bestPuzzle) return bestPuzzle;
 
-    // Fall-through
-    console.warn(`Could not strictly match ${targetDiff} tier perfectly. Providing best guaranteed-solvable grid.`);
-    const fbGrid = emptyGrid(); generateSolvedGrid(fbGrid, 3, 'standard');
+    // Guaranteed-solvable fallback (still 100% human-solvable with zero guessing)
+    console.warn(`Could not strictly match ${targetDiff} profile within budget. Generating guaranteed human-solvable grid.`);
+    const fbGrid = emptyGrid();
+    generateSolvedGrid(fbGrid, 3, 'standard');
     const fbRawCages = generateCages(fbGrid, targetDiff);
     const fbData = formatGeneratedCagesAndClues(fbGrid, fbRawCages, targetDiff);
-    
+
     let fbLogic = solveLogically(fbData.actualCages, fbData.initialG);
     while (!fbLogic.solved) {
-        let emptyCells = [];
-        for(let z=0; z<3; z++) for(let y=0; y<3; y++) for(let x=0; x<3; x++) {
-            if (fbLogic.grid[z][y][x] === 0 && fbData.initialG[z][y][x] === 0) emptyCells.push({z,y,x});
-        }
-        if (emptyCells.length === 0) break;
-        shuffleArray(emptyCells);
-        let target = emptyCells[0];
+        const target = pickBottleneckCell(fbLogic, fbData.initialG);
+        if (!target) break;
         fbData.initialG[target.z][target.y][target.x] = fbGrid[target.z][target.y][target.x];
         fbData.clues.push(`${target.z},${target.y},${target.x}`);
         fbLogic = solveLogically(fbData.actualCages, fbData.initialG);
     }
-    
-    return { clues: fbData.clues, initialGrid: fbData.initialG, solvedGrid: fbGrid, cages: fbData.actualCages, map: buildCageMap(fbData.actualCages) };
+
+    return {
+        clues: fbData.clues,
+        initialGrid: fbData.initialG,
+        solvedGrid: fbGrid,
+        cages: fbData.actualCages,
+        map: buildCageMap(fbData.actualCages)
+    };
 }
 
 // ---------------------------------------------------------
@@ -666,11 +1181,12 @@ let boardCache = { easy: [], medium: [], hard: [], fiendish: [] };
 let isCaching = false;
 
 function saveCache() {
-    localStorage.setItem('cubiku_killer_cache', JSON.stringify(boardCache));
+    localStorage.setItem('cubiku_killer_cache_v2', JSON.stringify(boardCache));
 }
 
 function loadCache() {
-    const saved = localStorage.getItem('cubiku_killer_cache');
+    localStorage.removeItem('cubiku_killer_cache');
+    const saved = localStorage.getItem('cubiku_killer_cache_v2');
     if (saved) {
         try { 
             boardCache = JSON.parse(saved); 
