@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v106 — Killer 3D Sudoku (Upgraded Human Solver & Difficulty Calibration)
+ * Cubiku Variants v107 — Killer 3D Sudoku (5-Tier Difficulty: Casual to Fiendish)
  */
 
 let currentVariant = "killer";
@@ -121,7 +121,7 @@ function generateCages(solvedGrid, difficulty = 'medium') {
         const start = unassigned.pop();
         
         let targetSize;
-        if (difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;
+        if (difficulty === 'casual' || difficulty === 'easy') targetSize = Math.floor(Math.random() * 2) + 2;
         else if (difficulty === 'fiendish') targetSize = Math.random() < 0.65 ? 3 : 4;
         else if (difficulty === 'hard') targetSize = Math.floor(Math.random() * 2) + 3;
         else targetSize = Math.floor(Math.random() * 2) + 2;
@@ -162,7 +162,9 @@ function generateCages(solvedGrid, difficulty = 'medium') {
             const offsets = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
             let merged = false;
             
-            const maxSize = (difficulty === 'hard' || difficulty === 'fiendish') ? 4 : (difficulty === 'easy' ? 3 : 4);
+            const maxSize = (difficulty === 'hard' || difficulty === 'fiendish')
+                ? 4
+                : ((difficulty === 'casual' || difficulty === 'easy') ? 3 : 4);
             
             for (const [dz, dy, dx] of offsets) {
                 const nz = loneCell.z + dz, ny = loneCell.y + dy, nx = loneCell.x + dx;
@@ -251,7 +253,6 @@ function evaluateCageAssignments(cellMasks, targetSum) {
     let forcedMask = 0x1ff;
     let foundAny = false;
 
-    // Precompute min/max possible sums of remaining cells for tight branch pruning
     const minRem = new Array(k + 1).fill(0);
     const maxRem = new Array(k + 1).fill(0);
     for (let i = k - 1; i >= 0; i--) {
@@ -389,7 +390,6 @@ function solveLogically(cagesTest, initialClues = null) {
         return false;
     }
 
-    // Helper for Rule-of-45 and Rule-of-90 innie/outie deductions
     function applyRegionSumDeductions(regionsList, tierLevel, singleWeight, pairWeight, allowThreeInnies) {
         let localProgress = false;
 
@@ -706,7 +706,7 @@ function solveLogically(cagesTest, initialClues = null) {
 
             for (let d = 1; d <= 9; d++) {
                 const bit = 1 << (d - 1);
-                if (!(evalRes.forcedMask & bit)) continue; // Only digits guaranteed in the cage can point out!
+                if (!(evalRes.forcedMask & bit)) continue;
 
                 const cellsWithD = emptyCells.filter(c => (cands[c.z][c.y][c.x] & bit));
                 if (cellsWithD.length < 2) continue;
@@ -1004,6 +1004,7 @@ function buildCageMap(cages) {
 }
 
 const DIFFICULTY_SPECS = {
+    casual:   { initialClues: 6, maxClues: 8, minTier: 0, maxTier: 0, minScore: 4,   maxScore: 22  },
     easy:     { initialClues: 3, maxClues: 4, minTier: 0, maxTier: 1, minScore: 15,  maxScore: 45  },
     medium:   { initialClues: 1, maxClues: 2, minTier: 1, maxTier: 2, minScore: 40,  maxScore: 85  },
     hard:     { initialClues: 0, maxClues: 1, minTier: 2, maxTier: 3, minScore: 80,  maxScore: 145 },
@@ -1059,10 +1060,6 @@ function copyGrid(grid) {
     return grid.map(z => z.map(y => [...y]));
 }
 
-/**
- * Picks a minimum-candidate bottleneck cell from the stalled solver state
- * so clue injection unlocks logical chains cleanly without collapsing the grid.
- */
 function pickBottleneckCell(logicState, currentInitialG) {
     let minCands = 10;
     let candidates = [];
@@ -1177,7 +1174,7 @@ async function generateGame(targetDiff = currentDifficulty) {
 // ---------------------------------------------------------
 // BACKGROUND CACHING SYSTEM
 // ---------------------------------------------------------
-let boardCache = { easy: [], medium: [], hard: [], fiendish: [] };
+let boardCache = { casual: [], easy: [], medium: [], hard: [], fiendish: [] };
 let isCaching = false;
 
 function saveCache() {
@@ -1190,12 +1187,13 @@ function loadCache() {
     if (saved) {
         try { 
             boardCache = JSON.parse(saved); 
+            if (!boardCache.casual) boardCache.casual = [];
             if (!boardCache.easy) boardCache.easy = [];
             if (!boardCache.medium) boardCache.medium = [];
             if (!boardCache.hard) boardCache.hard = [];
             if (!boardCache.fiendish) boardCache.fiendish = [];
         } catch(e) { 
-            boardCache = { easy: [], medium: [], hard: [], fiendish: [] }; 
+            boardCache = { casual: [], easy: [], medium: [], hard: [], fiendish: [] }; 
         }
     }
 }
@@ -1203,7 +1201,7 @@ function loadCache() {
 async function maintainCache() {
     if (isCaching) return;
     isCaching = true;
-    const diffs = ['easy', 'medium', 'hard', 'fiendish'];
+    const diffs = ['casual', 'easy', 'medium', 'hard', 'fiendish'];
     
     for (const diff of diffs) {
         const targetCount = diff === 'fiendish' ? 1 : 2;
@@ -1332,6 +1330,7 @@ let pencilMode = false;
 let isGameComplete = false; 
 
 let stats = {
+  casual:   { wins: 0, bestTime: null, totalTime: 0, lastTime: null },
   easy:     { wins: 0, bestTime: null, totalTime: 0, lastTime: null },
   medium:   { wins: 0, bestTime: null, totalTime: 0, lastTime: null },
   hard:     { wins: 0, bestTime: null, totalTime: 0, lastTime: null },
@@ -1411,6 +1410,7 @@ function loadStats() {
     try { 
         const loaded = JSON.parse(savedStats);
         stats = { ...stats, ...loaded };
+        if (!stats.casual) stats.casual = { wins: 0, bestTime: null, totalTime: 0, lastTime: null };
         if (!stats.fiendish) stats.fiendish = { wins: 0, bestTime: null, totalTime: 0, lastTime: null };
     } catch(e) {}
   } 
