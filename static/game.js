@@ -2357,8 +2357,7 @@ async function newGame() {
     
     const greetings = [
       "Calculations ready.", "Focus.", "🖖", "It all adds up eventually.", 
-      "The needs of the cube outweigh the needs of the one.", "Calculate.", 
-      "Don't guess.", "Logic dictates.", "Stay sharp."
+      "Live long and deduce.", "Fascinating.", "Logic dictates.", "Stay sharp."
     ];
     showMessage(greetings[Math.floor(Math.random() * greetings.length)], "info");
     
