@@ -1447,7 +1447,7 @@ let undoStack       = [];
 
 let activeNumber = null;
 let inspectedNumber = null;
-let currentDifficulty = "medium";
+let currentDifficulty = "casual";
 let currentTheme = "gold";
 let currentColorMode = "light";
 let stickyKeysEnabled = false; 
@@ -1508,7 +1508,7 @@ function loadPreferences() {
       currentTheme = prefs.theme || "gold";
       currentColorMode = prefs.mode || "light";
       stickyKeysEnabled = !!prefs.sticky;
-      currentDifficulty = prefs.difficulty || "medium";
+      currentDifficulty = prefs.difficulty || "casual";
       
       document.body.setAttribute('data-theme', currentTheme);
       const themeSelect = document.getElementById('theme-select');
@@ -1606,7 +1606,7 @@ function loadGame() {
     solvedGrid = data.solvedGrid || emptyGrid();
     clueSet = new Set(data.clues);
     currentCages = data.cages || [];
-    currentDifficulty = data.difficulty || "medium";
+    currentDifficulty = data.difficulty || "casual";
     
     cageMap = emptyGrid();
     for (const cage of currentCages) {
