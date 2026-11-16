@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v109 — Killer 3D Sudoku (Multi-Cell Selection + Calibrated 5-Tier Heuristic)
+ * Cubiku Variants v118 — Killer 3D Sudoku (Multi-Cell Selection + Default Light Mode)
  */
 
 let currentVariant = "killer";
@@ -1449,7 +1449,7 @@ let activeNumber = null;
 let inspectedNumber = null;
 let currentDifficulty = "medium";
 let currentTheme = "gold";
-let currentColorMode = "dark";
+let currentColorMode = "light";
 let stickyKeysEnabled = false; 
 let pencilMode = false;
 let isGameComplete = false; 
@@ -1477,7 +1477,7 @@ function syncThemeOptionLabels() {
 }
 
 function applyColorMode(mode) {
-  currentColorMode = mode === 'light' ? 'light' : 'dark';
+  currentColorMode = mode === 'dark' ? 'dark' : 'light';
   document.body.setAttribute('data-mode', currentColorMode);
 
   const metaTheme = document.querySelector('meta[name="theme-color"]');
@@ -1485,14 +1485,14 @@ function applyColorMode(mode) {
     metaTheme.setAttribute('content', currentColorMode === 'light' ? '#FFFFFF' : '#121212');
   }
 
-  const lightToggle = document.getElementById('toggle-light-mode');
-  if (lightToggle) lightToggle.checked = currentColorMode === 'light';
+  const darkToggle = document.getElementById('toggle-dark-mode');
+  if (darkToggle) darkToggle.checked = currentColorMode === 'dark';
 
   syncThemeOptionLabels();
 }
 
 function savePreferences() {
-  localStorage.setItem('cubiku_killer_prefs_v2', JSON.stringify({
+  localStorage.setItem('cubiku_killer_prefs_v3', JSON.stringify({
     theme: currentTheme,
     mode: currentColorMode,
     sticky: stickyKeysEnabled,
@@ -1501,12 +1501,12 @@ function savePreferences() {
 }
 
 function loadPreferences() {
-  const savedPrefs = localStorage.getItem('cubiku_killer_prefs_v2');
+  const savedPrefs = localStorage.getItem('cubiku_killer_prefs_v3');
   if (savedPrefs) {
     try {
       const prefs = JSON.parse(savedPrefs);
       currentTheme = prefs.theme || "gold";
-      currentColorMode = prefs.mode || "dark";
+      currentColorMode = prefs.mode || "light";
       stickyKeysEnabled = !!prefs.sticky;
       currentDifficulty = prefs.difficulty || "medium";
       
@@ -2385,10 +2385,10 @@ async function checkSolution() {
       saveStats();
     } else {
       showMessage(data.message, 'error');
-      if (!solvedGrid) solvedGrid = computeSolutionGrid();
+      if (!solvedGrid && typeof computeSolutionGrid === 'function') solvedGrid = computeSolutionGrid();
       if (Array.isArray(data.conflicts)) {
         data.conflicts.forEach(([z, row, col]) => {
-          if (!clueSet.has(`${z},${row},${col}`) && state[z][row][col] !== solvedGrid[z][row][col]) { getCell(z, row, col)?.classList.add('conflict'); }
+          if (!clueSet.has(`${z},${row},${col}`) && (!solvedGrid || state[z][row][col] !== solvedGrid[z][row][col])) { getCell(z, row, col)?.classList.add('conflict'); }
         });
       }
     }
@@ -2545,8 +2545,8 @@ function init() {
   const btnSettingsReset = document.getElementById('btn-settings-reset-stats'); if (btnSettingsReset) btnSettingsReset.addEventListener('click', (e) => { e.stopPropagation(); resetStats(); });
   const btnSettingsTut = document.getElementById('btn-settings-tutorial'); if (btnSettingsTut) btnSettingsTut.addEventListener('click', startTutorial);
 
-  const toggleLight = document.getElementById('toggle-light-mode'); if (toggleLight) toggleLight.addEventListener('change', (e) => {
-      applyColorMode(e.target.checked ? 'light' : 'dark');
+  const toggleDark = document.getElementById('toggle-dark-mode'); if (toggleDark) toggleDark.addEventListener('change', (e) => {
+      applyColorMode(e.target.checked ? 'dark' : 'light');
       savePreferences();
       renderState();
   });
