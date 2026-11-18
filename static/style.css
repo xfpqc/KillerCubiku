@@ -1,5 +1,5 @@
 /* =========================================================
-   Cubiku Variants v122 — Dark & Paper Light Mode + Share & Variant Switch
+   Cubiku Variants v123 — Dark & Paper Light Mode + Share & Tap-to-Hide Timer
    ========================================================= */
 
 *, *::before, *::after {
@@ -252,6 +252,7 @@ h1 {
 }
 .timer-bar:hover { background-color: var(--surface-subtle); }
 .timer-bar:focus-visible { outline: 1px solid var(--accent); }
+.timer-bar.zen #timer-display { opacity: 0.65; }
 #timer-display {
   font-size: clamp(1rem, 3.5vw, 1.25rem); font-weight: 300; letter-spacing: 3px;
   color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 4.4ch; text-align: center;
@@ -491,7 +492,7 @@ footer { color: var(--text-muted); font-size: clamp(0.68rem, 2vw, 0.78rem); font
 .tutorial-box {
   pointer-events: auto;
   position: absolute;
-  bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   background: var(--panel-bg);
@@ -503,6 +504,7 @@ footer { color: var(--text-muted); font-size: clamp(0.68rem, 2vw, 0.78rem); font
 }
 .tutorial-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--surface-border); padding-bottom: 0.4rem; }
 .tutorial-header h2 { font-size: 1.1rem; color: var(--accent); margin: 0; font-weight: 600; }
+.tutorial-header .btn-icon { width: 30px; height: 30px; font-size: 1.15rem; line-height: 1; }
 .tutorial-content { font-size: 0.9rem; color: var(--text-primary); line-height: 1.5; font-weight: 400; }
 .tutorial-actions { display: flex; justify-content: space-between; margin-top: 0.4rem; }
 
