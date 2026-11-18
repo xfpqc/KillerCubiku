@@ -1,10 +1,10 @@
-// Cubiku Variants v123 — Service Worker
-const CACHE_NAME = 'cubiku-killer-v123';
+// Cubiku Variants v124 — Service Worker
+const CACHE_NAME = 'cubiku-killer-v124';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './style.css?v=123',
-  './game.js?v=123',
+  './style.css?v=124',
+  './game.js?v=124',
   './manifest.json'
 ];
 

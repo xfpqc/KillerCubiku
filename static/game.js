@@ -40,7 +40,6 @@ const CAGE_LIGHT_RGB = [
 
 const CAGE_COLORS = CAGE_RGB.map(rgb => `rgb(${rgb})`);
 const B64URL_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-const STANDARD_VARIANT_URL = 'https://xfpqc.github.io/Cubiku/';
 
 function getCageBackground(cage) {
     const isLight = currentColorMode === 'light';
@@ -1776,8 +1775,6 @@ function loadPreferences() {
       if (diffSelect) diffSelect.value = currentDifficulty;
     } catch(e) {}
   }
-  const variantSelect = document.getElementById('variant-select');
-  if (variantSelect) variantSelect.value = 'killer';
   applyColorMode(currentColorMode);
 }
 
@@ -1968,6 +1965,15 @@ function toggleZen() {
     timerBar.setAttribute('aria-pressed', String(zenMode));
     timerBar.title = zenMode ? 'Tap to show timer' : 'Tap to hide timer';
   }
+  
+  const eyeOpen = document.getElementById('icon-eye-open');
+  const eyeClosed = document.getElementById('icon-eye-closed');
+  if (eyeOpen) eyeOpen.style.display = zenMode ? 'none' : '';
+  if (eyeClosed) eyeClosed.style.display = zenMode ? '' : 'none';
+  
+  const btnZen = document.getElementById('btn-zen');
+  if (btnZen) btnZen.title = zenMode ? 'Zen Mode — show timer' : 'Zen Mode — hide timer';
+
   updateTimerDisplay();
 }
 
@@ -2145,7 +2151,7 @@ function clearSelection() {
 
 function updateNumberHighlights() {
   document.querySelectorAll('.cell').forEach(el => el.classList.remove('number-highlight'));
-  if (tutorialActive) return;
+  if(tutorialActive) return;
 
   const targetVal = activeNumber !== null && activeNumber !== 'erase' && activeNumber !== 'undo' && activeNumber !== 'pencil' 
                     ? Number(activeNumber) : (inspectedNumber !== null ? Number(inspectedNumber) : null);
@@ -2500,7 +2506,7 @@ function flashConflicts(z, row, col, value) {
   }
 
   clashEls.forEach(el => {
-    if (!el) return;
+    if(!el) return;
     el.classList.remove('flash-conflict'); void el.offsetWidth; el.classList.add('flash-conflict');
     setTimeout(() => el.classList.remove('flash-conflict'), 1000);
   });
@@ -2510,18 +2516,11 @@ function onCellFocus(e) {
   if (tutorialActive || isDragSelecting) return;
   const el = e.currentTarget;
   const z = Number(el.dataset.z), row = Number(el.dataset.row), col = Number(el.dataset.col);
-  const key = `${z},${row},${col}`;
-
-  if (clueSet.has(key)) {
-    if (inspectedNumber === null) {
-      selectCell(z, row, col);
-    }
+  if (clueSet.has(`${z},${row},${col}`)) {
+    if (inspectedNumber === null) selectCell(z, row, col);
     return;
   }
-
-  if (activeNumber === null && !selected && inspectedNumber === null) {
-    selectCell(z, row, col);
-  }
+  if (activeNumber === null && !selected && inspectedNumber === null) selectCell(z, row, col);
 }
 
 function onCellPointerDown(e) {
@@ -2535,14 +2534,9 @@ function onCellPointerDown(e) {
   if (inspectedNumber !== null) { inspectedNumber = null; clearHighlights(); }
 
   if (clueSet.has(key)) {
-    inspectedNumber = String(state[z][row][col]);
-    activeNumber = null;
-    selected = null;
-    selectedCells.clear();
-    updateKeyboardUI();
-    updateNumberHighlights();
-    clearHighlights();
-    applyCrosshair(z, row, col);
+    inspectedNumber = String(state[z][row][col]); activeNumber = null;
+    selected = null; selectedCells.clear();
+    updateKeyboardUI(); updateNumberHighlights(); clearHighlights(); applyCrosshair(z, row, col);
     el.focus();
     return;
   }
@@ -2608,8 +2602,7 @@ function handleGlobalPointerUp() {
 
 function onCellKeydown(e) {
   if (tutorialActive) return;
-  const el = e.currentTarget;
-  const z = Number(el.dataset.z), row = Number(el.dataset.row), col = Number(el.dataset.col);
+  const el = e.currentTarget; const z = Number(el.dataset.z), row = Number(el.dataset.row), col = Number(el.dataset.col);
 
   if (e.key === 'Backspace' || e.key === 'Delete') {
     e.preventDefault();
@@ -2637,21 +2630,12 @@ function onCellKeydown(e) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoLastAction(); return; }
   if (e.key === 'Escape') { clearSelection(); el.blur(); return; }
 
-  const moves = {
-    ArrowRight: [z, row, (col + 1) % 3],
-    ArrowLeft:  [z, row, (col + 2) % 3],
-    ArrowDown:  [z, (row + 1) % 3, col],
-    ArrowUp:    [z, (row + 2) % 3, col]
-  };
+  const moves = { ArrowRight: [z, row, (col + 1) % 3], ArrowLeft:  [z, row, (col + 2) % 3], ArrowDown:  [z, (row + 1) % 3, col], ArrowUp:    [z, (row + 2) % 3, col] };
   if (moves[e.key]) {
     e.preventDefault();
     const [nz, nr, nc] = moves[e.key];
-    if (e.shiftKey) {
-      if (selected) selectRangeTo(nz, nr, nc);
-      else selectCell(nz, nr, nc);
-    } else {
-      selectCell(nz, nr, nc);
-    }
+    if (e.shiftKey && selected) selectRangeTo(nz, nr, nc);
+    else selectCell(nz, nr, nc);
     getCell(nz, nr, nc)?.focus();
   }
 }
@@ -2749,21 +2733,13 @@ async function checkSolution() {
   try {
     const data = check3SSC(state, 3, currentVariant);
     if (data.valid) {
-      isGameComplete = true;
-      document.querySelectorAll('.key-btn').forEach(btn => btn.classList.add('control-disabled')); 
-      stopTimer();
-      showMessage(data.message, 'success');
-      clearSelection();
-      clearSave(); 
+      isGameComplete = true; document.querySelectorAll('.key-btn').forEach(btn => btn.classList.add('control-disabled')); 
+      stopTimer(); showMessage(data.message, 'success'); clearSelection(); clearSave(); 
       
       if (!isSharedPuzzle) {
         const diff = currentDifficulty;
-        stats[diff].wins++;
-        stats[diff].totalTime += timerSeconds;
-        stats[diff].lastTime = timerSeconds;
-        if (stats[diff].bestTime === null || timerSeconds < stats[diff].bestTime) {
-          stats[diff].bestTime = timerSeconds;
-        }
+        stats[diff].wins++; stats[diff].totalTime += timerSeconds; stats[diff].lastTime = timerSeconds;
+        if (stats[diff].bestTime === null || timerSeconds < stats[diff].bestTime) stats[diff].bestTime = timerSeconds;
         saveStats();
       }
     } else {
@@ -2771,9 +2747,7 @@ async function checkSolution() {
       if (!solvedGrid && typeof computeSolutionGrid === 'function') solvedGrid = computeSolutionGrid();
       if (Array.isArray(data.conflicts)) {
         data.conflicts.forEach(([z, row, col]) => {
-          if (!clueSet.has(`${z},${row},${col}`) && (!solvedGrid || state[z][row][col] !== solvedGrid[z][row][col])) {
-            getCell(z, row, col)?.classList.add('conflict');
-          }
+          if (!clueSet.has(`${z},${row},${col}`) && (!solvedGrid || state[z][row][col] !== solvedGrid[z][row][col])) { getCell(z, row, col)?.classList.add('conflict'); }
         });
       }
     }
@@ -2798,7 +2772,7 @@ const tutorialSteps = [
         text: "Every 3x3 slice across all three dimensions (horizontal, vertical, and straight through the depth pillars) must contain the digits 1 through 9 exactly once.", 
         setup: () => { 
             clearHighlights(); 
-            for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) getCell(0, i, j).classList.add('tutorial-highlight');
+            for(let i=0; i<3; i++) for(let j=0; j<3; j++) getCell(0, i, j).classList.add('tutorial-highlight');
         } 
     },
     { 
@@ -2814,7 +2788,7 @@ const tutorialSteps = [
         text: "Because every 3x3 plane always contains exactly the digits 1-9, the total sum of the entire plane is ALWAYS 45. This is your secret weapon.", 
         setup: () => { 
             clearHighlights(); 
-            for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) getCell(1, i, j).classList.add('tutorial-highlight');
+            for(let i=0; i<3; i++) for(let j=0; j<3; j++) getCell(1, i, j).classList.add('tutorial-highlight');
         } 
     },
     { 
@@ -2968,7 +2942,7 @@ function init() {
       }
     });
   }
-
+  const btnZen = document.getElementById('btn-zen'); if (btnZen) btnZen.addEventListener('click', toggleZen);
   const btnSettingsReset = document.getElementById('btn-settings-reset-stats'); if (btnSettingsReset) btnSettingsReset.addEventListener('click', (e) => { e.stopPropagation(); resetStats(); });
   const btnSettingsTut = document.getElementById('btn-settings-tutorial'); if (btnSettingsTut) btnSettingsTut.addEventListener('click', startTutorial);
 
@@ -2989,23 +2963,6 @@ function init() {
       updateStatsUI(); 
       savePreferences(); 
       maintainCache();
-  });
-
-  const variantSelect = document.getElementById('variant-select');
-  if (variantSelect) {
-    variantSelect.value = 'killer';
-    variantSelect.addEventListener('change', (e) => {
-      if (e.target.value === 'standard') {
-        const settingsPanel = document.getElementById('settings-panel');
-        if (settingsPanel) settingsPanel.style.display = 'none';
-        if (tutorialActive) endTutorial();
-        window.location.href = STANDARD_VARIANT_URL;
-      }
-    });
-  }
-  window.addEventListener('pageshow', () => {
-    const vs = document.getElementById('variant-select');
-    if (vs) vs.value = 'killer';
   });
   
   const toggleSticky = document.getElementById('toggle-sticky-keys'); if (toggleSticky) toggleSticky.addEventListener('change', (e) => { stickyKeysEnabled = e.target.checked; savePreferences(); });
