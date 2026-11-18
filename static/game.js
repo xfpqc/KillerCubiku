@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v118 — Killer 3D Sudoku (Multi-Cell Selection + Default Light Mode)
+ * Cubiku Variants v122 — Killer 3D Sudoku (Base64URL ?k= Share + Tap-to-Hide Timer)
  */
 
 let currentVariant = "killer";
@@ -39,6 +39,7 @@ const CAGE_LIGHT_RGB = [
 ];
 
 const CAGE_COLORS = CAGE_RGB.map(rgb => `rgb(${rgb})`);
+const B64URL_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 function getCageBackground(cage) {
     const isLight = currentColorMode === 'light';
@@ -201,6 +202,254 @@ function generateCages(solvedGrid, difficulty = 'medium') {
     }
 
     return cages;
+}
+
+// ---------------------------------------------------------
+// COMPACT BASE64URL CAGE-AND-SUM ENCODER / DECODER (?k=...)
+// ---------------------------------------------------------
+function encodeKillerPuzzle(cages, initGrid, clues) {
+    const sortedCages = cages
+        .map(c => ({
+            sum: c.sum,
+            cells: [...c.cells].sort((a, b) => (9 * a.z + 3 * a.y + a.x) - (9 * b.z + 3 * b.y + b.x))
+        }))
+        .sort((a, b) => (9 * a.cells[0].z + 3 * a.cells[0].y + a.cells[0].x) - (9 * b.cells[0].z + 3 * b.cells[0].y + b.cells[0].x));
+
+    const M = sortedCages.length;
+    const cellCageId = new Array(27).fill(0);
+    for (let k = 0; k < M; k++) {
+        for (const c of sortedCages[k].cells) {
+            cellCageId[9 * c.z + 3 * c.y + c.x] = k + 1;
+        }
+    }
+
+    let clueMask = 0n;
+    const clueDigits = [];
+    for (let i = 0; i < 27; i++) {
+        const z = Math.floor(i / 9), y = Math.floor((i % 9) / 3), x = i % 3;
+        const val = initGrid && initGrid[z] && initGrid[z][y] ? initGrid[z][y][x] : 0;
+        if (clues.has(`${z},${y},${x}`) && val >= 1 && val <= 9) {
+            clueMask |= (1n << BigInt(i));
+            clueDigits.push(val);
+        }
+    }
+
+    let packed = 0n;
+    let bitPos = 0n;
+    const pushBits = (value, width) => {
+        const w = BigInt(width);
+        packed |= (BigInt(value) & ((1n << w) - 1n)) << bitPos;
+        bitPos += w;
+    };
+
+    pushBits(M, 4);
+    for (let i = 0; i < 27; i++) pushBits(cellCageId[i], 4);
+    for (let k = 0; k < M; k++) pushBits(sortedCages[k].sum, 6);
+    pushBits(clueMask, 27);
+    for (const d of clueDigits) pushBits(d, 4);
+
+    const totalChars = Math.ceil(Number(bitPos) / 6);
+    let out = '';
+    for (let c = 0; c < totalChars; c++) {
+        const sextet = Number((packed >> BigInt(c * 6)) & 0x3Fn);
+        out += B64URL_CHARS[sextet];
+    }
+    return out.replace(/A+$/, '') || 'A';
+}
+
+function solveKillerBacktrack(cages, initGrid) {
+    const grid = copyGrid(initGrid);
+    const localMap = buildCageMap(cages);
+    const cageRemainingSum = new Map();
+    const cageRemainingCells = new Map();
+    const cageUsedDigits = new Map();
+
+    for (const cage of cages) {
+        let sum = cage.sum;
+        let empty = 0;
+        let used = 0;
+        for (const c of cage.cells) {
+            const v = grid[c.z][c.y][c.x];
+            if (v > 0) {
+                sum -= v;
+                used |= (1 << (v - 1));
+            } else {
+                empty++;
+            }
+        }
+        cageRemainingSum.set(cage.id, sum);
+        cageRemainingCells.set(cage.id, empty);
+        cageUsedDigits.set(cage.id, used);
+    }
+
+    const empties = [];
+    for (let z = 0; z < 3; z++) {
+        for (let y = 0; y < 3; y++) {
+            for (let x = 0; x < 3; x++) {
+                if (grid[z][y][x] === 0) empties.push({ z, y, x });
+            }
+        }
+    }
+
+    let steps = 0;
+    const MAX_STEPS = 25000;
+
+    function dfs(idx) {
+        if (++steps > MAX_STEPS) return false;
+        if (idx === empties.length) return true;
+
+        const { z, y, x } = empties[idx];
+        const cage = localMap[z][y][x];
+
+        for (let d = 1; d <= 9; d++) {
+            if (!isValid(grid, x, y, z, d, 3, 'standard')) continue;
+
+            if (cage) {
+                const bit = 1 << (d - 1);
+                const used = cageUsedDigits.get(cage.id);
+                if (used & bit) continue;
+                const remSum = cageRemainingSum.get(cage.id) - d;
+                const remCells = cageRemainingCells.get(cage.id) - 1;
+                if (remCells === 0 && remSum !== 0) continue;
+                if (remCells > 0 && (remSum < remCells || remSum > remCells * 9)) continue;
+
+                grid[z][y][x] = d;
+                cageRemainingSum.set(cage.id, remSum);
+                cageRemainingCells.set(cage.id, remCells);
+                cageUsedDigits.set(cage.id, used | bit);
+
+                if (dfs(idx + 1)) return true;
+
+                grid[z][y][x] = 0;
+                cageRemainingSum.set(cage.id, remSum + d);
+                cageRemainingCells.set(cage.id, remCells + 1);
+                cageUsedDigits.set(cage.id, used);
+            } else {
+                grid[z][y][x] = d;
+                if (dfs(idx + 1)) return true;
+                grid[z][y][x] = 0;
+            }
+        }
+        return false;
+    }
+
+    return dfs(0) ? grid : null;
+}
+
+function decodeKillerPuzzle(encoded) {
+    if (typeof encoded !== 'string' || encoded.length < 18 || encoded.length > 48) return null;
+
+    let packed = 0n;
+    for (let c = 0; c < encoded.length; c++) {
+        const idx = B64URL_CHARS.indexOf(encoded[c]);
+        if (idx === -1) return null;
+        packed |= BigInt(idx) << BigInt(c * 6);
+    }
+
+    let bitPos = 0n;
+    const readBits = (width) => {
+        const w = BigInt(width);
+        const val = (packed >> bitPos) & ((1n << w) - 1n);
+        bitPos += w;
+        return val;
+    };
+
+    const M = Number(readBits(4));
+    if (M < 0 || M > 13) return null;
+
+    const cellCageId = new Array(27);
+    for (let i = 0; i < 27; i++) {
+        const cid = Number(readBits(4));
+        if (cid > M) return null;
+        cellCageId[i] = cid;
+    }
+
+    const sums = new Array(M);
+    for (let k = 0; k < M; k++) {
+        const s = Number(readBits(6));
+        if (s < 1 || s > 45) return null;
+        sums[k] = s;
+    }
+
+    const clueMask = readBits(27);
+    const initG = emptyGrid();
+    const clues = [];
+
+    for (let i = 0; i < 27; i++) {
+        if ((clueMask >> BigInt(i)) & 1n) {
+            const d = Number(readBits(4));
+            if (d < 1 || d > 9) return null;
+            const z = Math.floor(i / 9), y = Math.floor((i % 9) / 3), x = i % 3;
+            initG[z][y][x] = d;
+            clues.push(`${z},${y},${x}`);
+        }
+    }
+
+    if ((packed >> bitPos) !== 0n) return null;
+
+    const cages = [];
+    for (let k = 1; k <= M; k++) {
+        const cells = [];
+        for (let i = 0; i < 27; i++) {
+            if (cellCageId[i] === k) {
+                cells.push({
+                    z: Math.floor(i / 9),
+                    y: Math.floor((i % 9) / 3),
+                    x: i % 3
+                });
+            }
+        }
+        if (cells.length < 2) return null;
+        const colorIndex = (k - 1) % CAGE_COLORS.length;
+        cages.push({
+            id: k - 1,
+            cells,
+            sum: sums[k - 1],
+            colorIndex,
+            color: CAGE_COLORS[colorIndex]
+        });
+    }
+
+    // Validate clue consistency across planes and cages
+    for (let z = 0; z < 3; z++) {
+        for (let y = 0; y < 3; y++) {
+            for (let x = 0; x < 3; x++) {
+                const v = initG[z][y][x];
+                if (v !== 0) {
+                    initG[z][y][x] = 0;
+                    const ok = isValid(initG, x, y, z, v, 3, 'standard');
+                    initG[z][y][x] = v;
+                    if (!ok) return null;
+                }
+            }
+        }
+    }
+    for (const cage of cages) {
+        let pSum = 0;
+        let empties = 0;
+        const seen = new Set();
+        for (const c of cage.cells) {
+            const v = initG[c.z][c.y][c.x];
+            if (v !== 0) {
+                if (seen.has(v)) return null;
+                seen.add(v);
+                pSum += v;
+            } else {
+                empties++;
+            }
+        }
+        if (empties === 0 && pSum !== cage.sum) return null;
+        if (empties > 0 && pSum >= cage.sum) return null;
+    }
+
+    const solved = solveKillerBacktrack(cages, initG);
+    return {
+        clues,
+        initialGrid: initG,
+        solvedGrid: solved,
+        cages,
+        map: buildCageMap(cages)
+    };
 }
 
 // ---------------------------------------------------------
@@ -1453,6 +1702,7 @@ let currentColorMode = "light";
 let stickyKeysEnabled = false; 
 let pencilMode = false;
 let isGameComplete = false; 
+let isSharedPuzzle = false;
 
 let stats = {
   casual:   { wins: 0, bestTime: null, totalTime: 0, lastTime: null },
@@ -1588,6 +1838,39 @@ function saveGame() {
 
 function clearSave() { localStorage.removeItem('cubiku_killer_save'); }
 
+function applyPuzzleData(puzzle, messageText = 'Game resumed.') {
+  const { clues, initialGrid: initG, solvedGrid: solved, cages, map } = puzzle;
+
+  state = emptyGrid();
+  initialGrid = initG || emptyGrid();
+  for (let z = 0; z < 3; z++) {
+      for (let y = 0; y < 3; y++) {
+          for (let x = 0; x < 3; x++) {
+              state[z][y][x] = initialGrid[z][y][x];
+          }
+      }
+  }
+
+  drafts = emptyDrafts();
+  clueSet = new Set(clues);
+  undoStack = [];
+  timerSeconds = 0;
+  solvedGrid = solved || null;
+  currentCages = cages || [];
+  cageMap = map || buildCageMap(currentCages);
+  isGameComplete = false;
+  pencilMode = false;
+  activeNumber = null;
+
+  document.querySelectorAll('.key-btn').forEach(btn => btn.classList.remove('control-disabled'));
+  updateKeyboardUI();
+  renderState();
+  updateDepletion();
+  startTimer();
+  saveGame();
+  if (messageText) showMessage(messageText, 'info');
+}
+
 function loadGame() {
   const saved = localStorage.getItem('cubiku_killer_save');
   if (!saved) return false;
@@ -1603,7 +1886,7 @@ function loadGame() {
     }
 
     initialGrid = data.initialGrid || emptyGrid();
-    solvedGrid = data.solvedGrid || emptyGrid();
+    solvedGrid = data.solvedGrid || null;
     clueSet = new Set(data.clues);
     currentCages = data.cages || [];
     currentDifficulty = data.difficulty || "casual";
@@ -1643,6 +1926,10 @@ function stopTimer() { if (timerInterval) { clearInterval(timerInterval); timerI
 function updateTimerDisplay() {
   const display = document.getElementById('timer-display');
   if (!display) return;
+  if (zenMode) {
+    display.textContent = '--:--';
+    return;
+  }
   display.textContent = `${String(Math.floor(timerSeconds / 60)).padStart(2, '0')}:${String(Math.floor(timerSeconds % 60)).padStart(2, '0')}`;
 }
 
@@ -1650,7 +1937,10 @@ let zenMode = false;
 function toggleZen() {
   zenMode = !zenMode;
   const timerBar = document.getElementById('timer-bar');
-  if (timerBar) timerBar.classList.toggle('zen', zenMode);
+  if (timerBar) {
+    timerBar.classList.toggle('zen', zenMode);
+    timerBar.title = zenMode ? 'Tap to show timer' : 'Tap to hide timer';
+  }
   
   const eyeOpen = document.getElementById('icon-eye-open');
   const eyeClosed = document.getElementById('icon-eye-closed');
@@ -1659,6 +1949,49 @@ function toggleZen() {
   
   const btnZen = document.getElementById('btn-zen');
   if (btnZen) btnZen.title = zenMode ? 'Zen Mode — show timer' : 'Zen Mode — hide timer';
+
+  updateTimerDisplay();
+}
+
+let shareFeedbackTimer = null;
+async function sharePuzzle() {
+  if (tutorialActive || currentCages.length === 0) return;
+
+  try {
+    const encoded = encodeKillerPuzzle(currentCages, initialGrid, clueSet);
+    const shareUrl = `${window.location.origin}${window.location.pathname}?k=${encoded}`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(shareUrl);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = shareUrl;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+
+    const btnShare = document.getElementById('btn-share');
+    const iconShare = document.getElementById('icon-share');
+    const iconCheck = document.getElementById('icon-share-check');
+    if (btnShare) btnShare.classList.add('copied');
+    if (iconShare) iconShare.style.display = 'none';
+    if (iconCheck) iconCheck.style.display = '';
+
+    clearTimeout(shareFeedbackTimer);
+    shareFeedbackTimer = setTimeout(() => {
+      if (btnShare) btnShare.classList.remove('copied');
+      if (iconShare) iconShare.style.display = '';
+      if (iconCheck) iconCheck.style.display = 'none';
+    }, 1600);
+
+    showMessage('Puzzle link copied to clipboard!', 'info');
+  } catch (err) {
+    showMessage('Could not copy puzzle link.', 'error');
+  }
 }
 
 function toggleMenu() {
@@ -2318,6 +2651,10 @@ function handleKeyboardTap(valStr) {
 
 async function newGame() {
   if (tutorialActive) endTutorial();
+  if (window.location.search) {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+  isSharedPuzzle = false;
   setLoading(true); hideMessage(); stopTimer(); clearSave(); clearSelection(); isGameComplete = false; 
   pencilMode = false; activeNumber = null;
   
@@ -2336,30 +2673,11 @@ async function newGame() {
         puzzle = await generateGame(currentDifficulty);
     }
     
-    const { clues, initialGrid: initG, solvedGrid: solved, cages, map } = puzzle;
-    
-    state = emptyGrid(); 
-    initialGrid = initG || emptyGrid();
-    for (let z = 0; z < 3; z++) {
-        for (let y = 0; y < 3; y++) {
-            for (let x = 0; x < 3; x++) {
-                state[z][y][x] = initialGrid[z][y][x];
-            }
-        }
-    }
-
-    drafts = emptyDrafts(); 
-    clueSet = new Set(clues);
-    undoStack = []; timerSeconds = 0; solvedGrid = solved; currentCages = cages;
-    cageMap = map || buildCageMap(cages);
-
-    renderState(); updateDepletion(); startTimer(); saveGame(); 
-    
     const greetings = [
       "Calculations ready.", "Focus.", "🖖", "It all adds up eventually.", 
       "Live long and deduce.", "Fascinating.", "Logic dictates.", "Stay sharp."
     ];
-    showMessage(greetings[Math.floor(Math.random() * greetings.length)], "info");
+    applyPuzzleData(puzzle, greetings[Math.floor(Math.random() * greetings.length)]);
     
     setTimeout(maintainCache, 500);
     
@@ -2529,6 +2847,7 @@ function init() {
   
   const btnNew = document.getElementById('btn-new-game'); if (btnNew) btnNew.addEventListener('click', newGame);
   const btnMenu = document.getElementById('btn-menu'); if (btnMenu) btnMenu.addEventListener('click', toggleMenu);
+  const btnShare = document.getElementById('btn-share'); if (btnShare) btnShare.addEventListener('click', sharePuzzle);
   const btnRestart = document.getElementById('btn-restart');
   if (btnRestart) btnRestart.addEventListener('click', () => {
       if (confirm("Are you sure you want to restart this puzzle from the beginning?")) {
@@ -2540,6 +2859,16 @@ function init() {
       }
   });
 
+  const timerBar = document.getElementById('timer-bar');
+  if (timerBar) {
+    timerBar.addEventListener('click', toggleZen);
+    timerBar.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleZen();
+      }
+    });
+  }
   const btnZen = document.getElementById('btn-zen'); if (btnZen) btnZen.addEventListener('click', toggleZen);
   const btnSettingsReset = document.getElementById('btn-settings-reset-stats'); if (btnSettingsReset) btnSettingsReset.addEventListener('click', (e) => { e.stopPropagation(); resetStats(); });
   const btnSettingsTut = document.getElementById('btn-settings-tutorial'); if (btnSettingsTut) btnSettingsTut.addEventListener('click', startTutorial);
@@ -2587,6 +2916,23 @@ function init() {
       if (document.activeElement && document.activeElement.classList.contains('cell')) document.activeElement.blur();
     }
   });
+
+  const sharedParam = new URLSearchParams(window.location.search).get('k');
+  if (sharedParam) {
+    const decoded = decodeKillerPuzzle(sharedParam);
+    if (decoded) {
+      isSharedPuzzle = true;
+      applyPuzzleData(decoded, 'Shared puzzle loaded.');
+      setTimeout(maintainCache, 1000);
+      return;
+    } else {
+      window.history.replaceState({}, '', window.location.pathname);
+      if (!loadGame()) newGame();
+      else setTimeout(maintainCache, 1000);
+      showMessage('Invalid puzzle link.', 'error');
+      return;
+    }
+  }
 
   if (!loadGame()) newGame();
   else setTimeout(maintainCache, 1000); 

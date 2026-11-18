@@ -1,5 +1,5 @@
 /* =========================================================
-   Cubiku Variants v76 — Dark & Paper Light Mode + Multi-Select
+   Cubiku Variants v122 — Dark & Paper Light Mode + Share & Variant Switch
    ========================================================= */
 
 *, *::before, *::after {
@@ -168,7 +168,9 @@ html, body {
   .super-title { font-size: 0.65rem; margin-bottom: -0.2rem; }
   h1 { font-size: 2.1rem; }
   
-  .top-action-bar { margin-top: 0.8rem; margin-bottom: 0; }
+  .top-action-bar { margin-top: 0.8rem; margin-bottom: 0; padding: 0 0.25rem; }
+  .top-left-group { gap: 6px; margin-right: 8px; }
+  .controls { gap: 6px; margin-left: 8px; }
   .message-bar { min-height: auto; padding: 0.05rem 0.5rem; font-size: 0.72rem; margin: 0 auto; }
   
   .slices-container { gap: 6px; margin-top: 0.8rem; margin-bottom: 1rem; }
@@ -187,6 +189,14 @@ html, body {
     margin-top: 1.8rem; 
     padding-bottom: env(safe-area-inset-bottom);  
   } 
+}
+
+@media (max-width: 400px) {
+  .btn { padding: 0 1rem; font-size: 0.8rem; height: 36px; }
+  .btn-icon { width: 35px; height: 35px; }
+  .top-left-group { gap: 4px; margin-right: 6px; }
+  .controls { gap: 4px; margin-left: 6px; }
+  #timer-display { font-size: 0.92rem; letter-spacing: 2px; }
 }
 
 /* =========================================================
@@ -232,12 +242,20 @@ h1 {
 }
 
 .top-left-group { justify-self: end; display: flex; align-items: center; gap: 10px; margin-right: 12px; }
-.timer-bar { display: flex; align-items: center; }
+.timer-bar {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 0.25rem 0.45rem;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+.timer-bar:hover { background-color: var(--surface-subtle); }
+.timer-bar:focus-visible { outline: 1px solid var(--accent); }
 #timer-display {
   font-size: clamp(1rem, 3.5vw, 1.25rem); font-weight: 300; letter-spacing: 3px;
-  color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 3.8ch; text-align: center;
+  color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 4.4ch; text-align: center;
 }
-.timer-bar.zen #timer-display { visibility: hidden; }
 .center-action { justify-self: center; }
 .controls { justify-self: start; position: relative; display: flex; align-items: center; gap: 10px; margin-left: 12px; }
 
@@ -256,28 +274,66 @@ h1 {
 .btn-icon {
   width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;
   background: transparent; border: 1px solid var(--grid-line); border-radius: 50%;
-  color: var(--text-muted); cursor: pointer; transition: border-color 0.15s, color 0.15s, transform 0.1s;
+  color: var(--text-muted); cursor: pointer; transition: border-color 0.15s, color 0.15s, transform 0.1s, background-color 0.15s;
   touch-action: manipulation; flex-shrink: 0; padding: 0;
 }
 .btn-icon:hover { border-color: var(--border-hover); color: var(--text-primary); }
 .btn-icon:active { transform: scale(0.93); }
+.btn-icon.copied { border-color: var(--accent); color: var(--accent); background: var(--surface-subtle); }
 .btn-icon *, .key-btn *, .cell * { pointer-events: none; }
 
 .settings-panel {
   position: absolute; top: calc(100% + 10px); right: 0; z-index: 200;
   background: var(--panel-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--surface-border); padding: 0.5rem 0; border-radius: 14px;
-  display: flex; flex-direction: column; width: 225px; max-height: 70vh; overflow-y: auto;
+  display: flex; flex-direction: column; width: 235px; max-height: 75vh; overflow-y: auto;
   box-shadow: var(--panel-shadow);
 }
 .settings-panel::-webkit-scrollbar { width: 4px; }
 .settings-panel::-webkit-scrollbar-thumb { background: var(--surface-border); border-radius: 4px; }
-@media (max-width: 599px) { .settings-panel { right: -10px; width: 235px; } }
+@media (max-width: 599px) { .settings-panel { right: -10px; width: 240px; } }
 
 .setting-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; font-weight: 500; color: var(--text-primary); padding: 0.62rem 1.25rem; transition: background 0.15s; }
 .setting-item.action-item { cursor: pointer; }
 .setting-item.action-item:hover { background: var(--surface-subtle); }
 .setting-divider { height: 1px; background: var(--surface-border); margin: 0.2rem 0; }
+
+/* Segmented Pill Variant Switcher */
+.variant-switch {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-subtle);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.variant-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.28rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-decoration: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.variant-pill:hover:not(.active) {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.variant-pill.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: default;
+}
 
 .select-wrapper { position: relative; display: inline-block; width: 110px; }
 .select-wrapper select {

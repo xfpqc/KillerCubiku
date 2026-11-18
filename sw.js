@@ -1,10 +1,10 @@
-const CACHE_NAME = 'cubiku-variants-v121';
+const CACHE_NAME = 'cubiku-variants-v122';
 
 const ASSETS = [
   './',
   './index.html',
-  './static/style.css?v=121',
-  './static/game.js?v=121',
+  './static/style.css?v=122',
+  './static/game.js?v=122',
   './static/icon-512.png',
   './static/manifest.json'
 ];
@@ -31,8 +31,28 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      caches.match(event.request, { ignoreSearch: true }).then((cachedNav) => {
+        const fallbackShell = cachedNav || caches.match('./index.html');
+        const networkFetch = fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const clone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', clone));
+            }
+            return networkResponse;
+          })
+          .catch(() => fallbackShell);
+
+        return fallbackShell.then((cached) => cached || networkFetch);
+      })
+    );
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
@@ -42,9 +62,7 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch((err) => {
-          if (!cachedResponse && event.request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
+          if (cachedResponse) return cachedResponse;
           throw err;
         });
 
