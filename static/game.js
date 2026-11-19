@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v125 — Killer 3D Sudoku (Base64URL ?k= Share + Tap-to-Hide Timer)
+ * Cubiku Variants v126 — Killer 3D Sudoku (Share Button Slot + Variant Select Sync)
  */
 
 let currentVariant = "killer";
@@ -40,6 +40,7 @@ const CAGE_LIGHT_RGB = [
 
 const CAGE_COLORS = CAGE_RGB.map(rgb => `rgb(${rgb})`);
 const B64URL_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const STANDARD_CUBIKU_URL = 'https://xfpqc.github.io/Cubiku/';
 
 function getCageBackground(cage) {
     const isLight = currentColorMode === 'light';
@@ -1763,19 +1764,52 @@ function loadPreferences() {
       currentColorMode = prefs.mode || "light";
       stickyKeysEnabled = !!prefs.sticky;
       currentDifficulty = prefs.difficulty || "casual";
-      
-      document.body.setAttribute('data-theme', currentTheme);
-      const themeSelect = document.getElementById('theme-select');
-      if (themeSelect) themeSelect.value = currentTheme;
-      
-      const stickyToggle = document.getElementById('toggle-sticky-keys');
-      if (stickyToggle) stickyToggle.checked = stickyKeysEnabled;
-      
-      const diffSelect = document.getElementById('difficulty-select');
-      if (diffSelect) diffSelect.value = currentDifficulty;
     } catch(e) {}
   }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  let syncedFromUrl = false;
+
+  if (urlParams.has('mode')) {
+    const m = urlParams.get('mode');
+    if (m === 'light' || m === 'dark') {
+      currentColorMode = m;
+      syncedFromUrl = true;
+    }
+  }
+  if (urlParams.has('theme')) {
+    const t = urlParams.get('theme');
+    if (['cyan', 'lavender', 'rose', 'gold', 'silver'].includes(t)) {
+      currentTheme = t;
+      syncedFromUrl = true;
+    }
+  }
+  if (urlParams.has('sticky')) {
+    stickyKeysEnabled = urlParams.get('sticky') === '1';
+    syncedFromUrl = true;
+  }
+
+  document.body.setAttribute('data-theme', currentTheme);
+  const themeSelect = document.getElementById('theme-select');
+  if (themeSelect) themeSelect.value = currentTheme;
+
+  const stickyToggle = document.getElementById('toggle-sticky-keys');
+  if (stickyToggle) stickyToggle.checked = stickyKeysEnabled;
+
+  const diffSelect = document.getElementById('difficulty-select');
+  if (diffSelect) diffSelect.value = currentDifficulty;
+
   applyColorMode(currentColorMode);
+
+  if (syncedFromUrl) {
+    savePreferences();
+    urlParams.delete('mode');
+    urlParams.delete('theme');
+    urlParams.delete('sticky');
+    const remaining = urlParams.toString();
+    const cleanUrl = remaining ? `${window.location.pathname}?${remaining}` : window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+  }
 }
 
 function saveStats() {
@@ -1815,7 +1849,7 @@ function formatTime(seconds) {
 }
 
 function updateStatsUI() {
-  const currentStats = stats[currentDifficulty] || stats['medium'];
+  const currentStats = stats[currentDifficulty] || stats['casual'];
   const elWins = document.getElementById('stat-wins');
   if (elWins) elWins.textContent = currentStats.wins;
   const elBest = document.getElementById('stat-best');
@@ -1965,15 +1999,6 @@ function toggleZen() {
     timerBar.setAttribute('aria-pressed', String(zenMode));
     timerBar.title = zenMode ? 'Tap to show timer' : 'Tap to hide timer';
   }
-  
-  const eyeOpen = document.getElementById('icon-eye-open');
-  const eyeClosed = document.getElementById('icon-eye-closed');
-  if (eyeOpen) eyeOpen.style.display = zenMode ? 'none' : '';
-  if (eyeClosed) eyeClosed.style.display = zenMode ? '' : 'none';
-  
-  const btnZen = document.getElementById('btn-zen');
-  if (btnZen) btnZen.title = zenMode ? 'Zen Mode — show timer' : 'Zen Mode — hide timer';
-
   updateTimerDisplay();
 }
 
@@ -2942,7 +2967,6 @@ function init() {
       }
     });
   }
-  const btnZen = document.getElementById('btn-zen'); if (btnZen) btnZen.addEventListener('click', toggleZen);
   const btnSettingsReset = document.getElementById('btn-settings-reset-stats'); if (btnSettingsReset) btnSettingsReset.addEventListener('click', (e) => { e.stopPropagation(); resetStats(); });
   const btnSettingsTut = document.getElementById('btn-settings-tutorial'); if (btnSettingsTut) btnSettingsTut.addEventListener('click', startTutorial);
 
@@ -2963,6 +2987,26 @@ function init() {
       updateStatsUI(); 
       savePreferences(); 
       maintainCache();
+  });
+
+  const variantSelect = document.getElementById('variant-select');
+  if (variantSelect) {
+    variantSelect.value = 'killer';
+    variantSelect.addEventListener('change', (e) => {
+      if (e.target.value === 'standard') {
+        const params = new URLSearchParams({
+          mode: currentColorMode,
+          theme: currentTheme,
+          sticky: stickyKeysEnabled ? '1' : '0'
+        });
+        window.location.href = `${STANDARD_CUBIKU_URL}?${params.toString()}`;
+      }
+    });
+  }
+
+  window.addEventListener('pageshow', () => {
+    const vs = document.getElementById('variant-select');
+    if (vs) vs.value = 'killer';
   });
   
   const toggleSticky = document.getElementById('toggle-sticky-keys'); if (toggleSticky) toggleSticky.addEventListener('change', (e) => { stickyKeysEnabled = e.target.checked; savePreferences(); });

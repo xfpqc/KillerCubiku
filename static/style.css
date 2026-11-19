@@ -1,5 +1,5 @@
 /* =========================================================
-   Cubiku Variants v125 — Dark & Paper Light Mode + Share & Variant Switch
+   Cubiku Variants v126 — Dark & Paper Light Mode + Share & Variant Select
    ========================================================= */
 
 *, *::before, *::after {
@@ -298,43 +298,6 @@ h1 {
 .setting-item.action-item { cursor: pointer; }
 .setting-item.action-item:hover { background: var(--surface-subtle); }
 .setting-divider { height: 1px; background: var(--surface-border); margin: 0.2rem 0; }
-
-/* Segmented Pill Variant Switcher */
-.variant-switch {
-  display: inline-flex;
-  align-items: center;
-  background: var(--surface-subtle);
-  border: 1px solid var(--surface-border);
-  border-radius: 8px;
-  padding: 2px;
-  gap: 2px;
-}
-
-.variant-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.28rem 0.55rem;
-  border-radius: 6px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  text-decoration: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: background-color 0.18s ease, color 0.18s ease;
-}
-
-.variant-pill:hover:not(.active) {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-}
-
-.variant-pill.active {
-  background: var(--accent);
-  color: var(--accent-text);
-  cursor: default;
-}
 
 .select-wrapper { position: relative; display: inline-block; width: 110px; }
 .select-wrapper select {
