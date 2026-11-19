@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v126 — Killer 3D Sudoku (Share Button Slot + Variant Select Sync)
+ * Cubiku Variants v127 — Killer 3D Sudoku (Share Link Difficulty Preservation)
  */
 
 let currentVariant = "killer";
@@ -206,7 +206,7 @@ function generateCages(solvedGrid, difficulty = 'medium') {
 }
 
 // ---------------------------------------------------------
-// COMPACT BASE64URL CAGE-AND-SUM ENCODER / DECODER (?k=...)
+// COMPACT BASE64URL CAGE-AND-SUM ENCODER / DECODER (?k=...&d=...)
 // ---------------------------------------------------------
 function encodeKillerPuzzle(cages, initGrid, clues) {
     const sortedCages = cages
@@ -1468,6 +1468,22 @@ function scoreDifficultyFit(logic, clueCount, spec) {
     return penalty;
 }
 
+function inferKillerDifficulty(decoded) {
+    const logic = solveLogically(decoded.cages, decoded.initialGrid, 4);
+    const clueCount = decoded.clues.length;
+    let bestDiff = currentDifficulty;
+    let bestPenalty = Infinity;
+
+    for (const [diff, spec] of Object.entries(DIFFICULTY_SPECS)) {
+        const penalty = scoreDifficultyFit(logic, clueCount, spec);
+        if (penalty < bestPenalty) {
+            bestPenalty = penalty;
+            bestDiff = diff;
+        }
+    }
+    return bestDiff;
+}
+
 async function generateGame(targetDiff = currentDifficulty) {
     const spec = DIFFICULTY_SPECS[targetDiff] || DIFFICULTY_SPECS.medium;
     let bestPuzzle = null;
@@ -2008,7 +2024,7 @@ async function sharePuzzle() {
 
   try {
     const encoded = encodeKillerPuzzle(currentCages, initialGrid, clueSet);
-    const shareUrl = `${window.location.origin}${window.location.pathname}?k=${encoded}`;
+    const shareUrl = `${window.location.origin}${window.location.pathname}?k=${encoded}&d=${encodeURIComponent(currentDifficulty)}`;
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(shareUrl);
@@ -3034,10 +3050,19 @@ function init() {
     }
   });
 
-  const sharedParam = new URLSearchParams(window.location.search).get('k');
+  const urlParams = new URLSearchParams(window.location.search);
+  const sharedParam = urlParams.get('k');
   if (sharedParam) {
     const decoded = decodeKillerPuzzle(sharedParam);
     if (decoded) {
+      const rawDiff = (urlParams.get('d') || urlParams.get('difficulty') || '').toLowerCase();
+      currentDifficulty = DIFFICULTY_SPECS[rawDiff] ? rawDiff : inferKillerDifficulty(decoded);
+
+      const diffSelectEl = document.getElementById('difficulty-select');
+      if (diffSelectEl) diffSelectEl.value = currentDifficulty;
+      updateStatsUI();
+      savePreferences();
+
       isSharedPuzzle = true;
       applyPuzzleData(decoded, 'Shared puzzle loaded.');
       setTimeout(maintainCache, 1000);
