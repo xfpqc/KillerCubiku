@@ -1,5 +1,5 @@
 /* =========================================================
-   Cubiku Variants v123 — Dark & Paper Light Mode + Share & Tap-to-Hide Timer
+   Cubiku Variants v125 — Dark & Paper Light Mode + Share & Variant Switch
    ========================================================= */
 
 *, *::before, *::after {
@@ -504,7 +504,6 @@ footer { color: var(--text-muted); font-size: clamp(0.68rem, 2vw, 0.78rem); font
 }
 .tutorial-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--surface-border); padding-bottom: 0.4rem; }
 .tutorial-header h2 { font-size: 1.1rem; color: var(--accent); margin: 0; font-weight: 600; }
-.tutorial-header .btn-icon { width: 30px; height: 30px; font-size: 1.15rem; line-height: 1; }
 .tutorial-content { font-size: 0.9rem; color: var(--text-primary); line-height: 1.5; font-weight: 400; }
 .tutorial-actions { display: flex; justify-content: space-between; margin-top: 0.4rem; }
 

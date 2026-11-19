@@ -1,41 +1,62 @@
-<!-- Cubiku Variants v124 — Killer 3D Sudoku -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#FFFFFF">
-  <meta name="description" content="Cubiku — Killer 3D Sudoku (3×3×3 Solid Sudoku Subcube)">
-  <title>Cubiku — Killer 3D Sudoku</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="style.css?v=124">
+  <meta charset="UTF-8" />
+  <title>Killer Cubiku</title>
+  <meta name="description" content="3D Killer Sudoku puzzle." />
+  <meta name="author" content="Trevor Murengu Mulindi" />
+  
+  <meta property="og:title" content="Killer Cubiku" />
+  <meta property="og:description" content="3D Killer Sudoku puzzle." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://xfpqc.github.io/KillerCubiku/static/og-image.png" />
+
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Killer Cubiku" />
+  <meta name="twitter:description" content="3D Killer Sudoku puzzle." />
+  <meta name="twitter:image" content="https://xfpqc.github.io/KillerCubiku/static/og-image.png" />
+
+  <meta name="theme-color" content="#FFFFFF" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="./static/style.css?v=125" />
+  <link rel="manifest" href="./static/manifest.json" />
+  
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Killer Cubiku" />
+  <link rel="apple-touch-icon" href="./static/icon-512.png" />
+  <link rel="icon" type="image/png" href="./static/icon-512.png" />
 </head>
 <body data-theme="gold" data-mode="light">
   <div class="page-wrapper">
+
     <header class="app-header">
-      <span class="super-title">Killer 3D Sudoku</span>
+      <span class="super-title">Killer</span>
       <h1>Cubiku</h1>
     </header>
 
     <div class="top-action-bar">
       <div class="top-left-group">
-        <button type="button" id="btn-share" class="btn-icon" title="Copy puzzle link" aria-label="Share puzzle">
-          <svg id="icon-share" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-            <polyline points="16 6 12 2 8 6"></polyline>
-            <line x1="12" y1="2" x2="12" y2="15"></line>
-          </svg>
-          <svg id="icon-share-check" style="display: none;" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-        </button>
-
-        <div id="timer-bar" class="timer-bar" role="button" tabindex="0" aria-pressed="false" title="Tap to hide timer">
+        <div class="timer-bar" id="timer-bar" role="button" tabindex="0" aria-pressed="false" aria-label="Toggle Timer Visibility" title="Tap to hide/show timer">
           <span id="timer-display">00:00</span>
         </div>
+        <button type="button" id="btn-zen" class="btn-icon" aria-label="Toggle Zen Mode" title="Zen Mode — hide timer">
+          <svg id="icon-eye-open" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg id="icon-eye-closed" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="display:none">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        </button>
       </div>
 
       <div class="center-action">
@@ -43,17 +64,28 @@
       </div>
 
       <div class="controls">
-        <button type="button" id="btn-restart" class="btn-icon" title="Restart Puzzle" aria-label="Restart Puzzle">
-          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button type="button" id="btn-restart" class="btn-icon" aria-label="Restart Puzzle" title="Restart Puzzle">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-            <path d="M3 3v5h5"></path>
+            <polyline points="3 3 3 8 8 8"></polyline>
           </svg>
         </button>
-
-        <button type="button" id="btn-menu" class="btn-icon" title="Settings" aria-label="Settings">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6"></line>
+        <button type="button" id="btn-share" class="btn-icon" aria-label="Share Puzzle" title="Copy Shareable Puzzle Link">
+          <svg id="icon-share" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+          <svg id="icon-share-check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="display:none">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </button>
+        <button type="button" id="btn-menu" class="btn-icon" aria-label="Menu" title="Menu">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
             <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
             <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
@@ -61,16 +93,36 @@
         <div id="settings-panel" class="settings-panel" style="display: none;">
           <div class="setting-item">
             <span>Variant</span>
-            <div class="variant-switch" role="group" aria-label="Variant Switcher">
+            <div class="variant-switch" role="group" aria-label="Puzzle Variant">
               <a href="https://xfpqc.github.io/Cubiku/" class="variant-pill">Standard</a>
               <span class="variant-pill active" aria-current="page">Killer</span>
             </div>
           </div>
+          <div class="setting-divider"></div>
 
+          <div class="setting-item action-item" id="btn-settings-tutorial">
+            <span>How to Play</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <div class="setting-divider"></div>
+          
+          <div class="setting-item action-item" id="btn-settings-reset-stats">
+            <span>Reset Stats</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="color: var(--error-color);">
+              <path d="M3 6h18"></path>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </div>
+          <div class="setting-divider"></div>
+          
           <div class="setting-item">
             <span>Difficulty</span>
             <div class="select-wrapper">
-              <select id="difficulty-select" aria-label="Difficulty">
+              <select id="difficulty-select">
                 <option value="casual" selected>Casual</option>
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
@@ -81,19 +133,17 @@
           </div>
 
           <div class="setting-item">
-            <span>Theme</span>
+            <span>Accent</span>
             <div class="select-wrapper">
-              <select id="theme-select" aria-label="Theme">
-                <option value="gold" selected>Amber</option>
-                <option value="cyan">Teal</option>
-                <option value="lavender">Violet</option>
-                <option value="rose">Crimson</option>
-                <option value="silver">Slate</option>
+              <select id="theme-select">
+                <option value="cyan">Cyan</option>
+                <option value="lavender">Lavender</option>
+                <option value="rose">Rose</option>
+                <option value="gold" selected>Gold</option>
+                <option value="silver">Silver</option>
               </select>
             </div>
           </div>
-
-          <div class="setting-divider"></div>
 
           <div class="setting-item">
             <span>Dark Mode</span>
@@ -110,68 +160,59 @@
               <span class="slider"></span>
             </label>
           </div>
-
-          <div class="setting-divider"></div>
-
-          <div id="btn-settings-tutorial" class="setting-item action-item">
-            <span>How to Play</span>
-          </div>
-
-          <div id="btn-settings-reset-stats" class="setting-item action-item" style="color: var(--error-color);">
-            <span>Reset Stats</span>
-          </div>
         </div>
       </div>
     </div>
 
-    <div id="message-bar" class="message-bar hidden" role="status" aria-live="polite"></div>
+    <div id="message-bar" class="message-bar hidden"></div>
 
-    <main class="slices-container" aria-label="3D Sudoku Slices">
+    <div class="slices-container" id="slices-container">
       <div class="slice-wrapper">
-        <span class="slice-label">z = 0</span>
-        <div id="grid-z0" class="grid" aria-label="Slice z=0"></div>
+        <p class="slice-label">z = 0</p>
+        <div class="grid" id="grid-z0"></div>
       </div>
       <div class="slice-wrapper">
-        <span class="slice-label">z = 1</span>
-        <div id="grid-z1" class="grid" aria-label="Slice z=1"></div>
+        <p class="slice-label">z = 1</p>
+        <div class="grid" id="grid-z1"></div>
       </div>
       <div class="slice-wrapper">
-        <span class="slice-label">z = 2</span>
-        <div id="grid-z2" class="grid" aria-label="Slice z=2"></div>
+        <p class="slice-label">z = 2</p>
+        <div class="grid" id="grid-z2"></div>
       </div>
-    </main>
+    </div>
 
-    <div class="keyboard-container" aria-label="Number Keypad">
+    <div id="onscreen-keyboard" class="keyboard-container">
       <button type="button" class="key-btn" data-val="1">1</button>
       <button type="button" class="key-btn" data-val="2">2</button>
       <button type="button" class="key-btn" data-val="3">3</button>
       <button type="button" class="key-btn" data-val="4">4</button>
       <button type="button" class="key-btn" data-val="5">5</button>
-      <button type="button" id="btn-pencil" class="key-btn" data-val="pencil" title="Toggle Pencil Mode" aria-label="Pencil Mode">
+      <button type="button" class="key-btn" data-val="6">6</button>
+      
+      <button type="button" class="key-btn" data-val="7">7</button>
+      <button type="button" class="key-btn" data-val="8">8</button>
+      <button type="button" class="key-btn" data-val="9">9</button>
+      <button type="button" class="key-btn" data-val="erase" title="Erase" aria-label="Erase">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+          <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path>
+          <line x1="18" y1="9" x2="12" y2="15"></line>
+          <line x1="12" y1="9" x2="18" y2="15"></line>
+        </svg>
+      </button>
+      <button type="button" class="key-btn" data-val="undo" title="Undo" aria-label="Undo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+          <path d="M3 7v6h6"></path>
+          <path d="M3 13a9 9 0 0 1 15-6.7L21 10"></path>
+        </svg>
+      </button>
+      <button type="button" class="key-btn" id="btn-pencil" data-val="pencil" title="Toggle Pencil Mode" aria-label="Pencil Mode">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
           <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
         </svg>
       </button>
-
-      <button type="button" class="key-btn" data-val="6">6</button>
-      <button type="button" class="key-btn" data-val="7">7</button>
-      <button type="button" class="key-btn" data-val="8">8</button>
-      <button type="button" class="key-btn" data-val="9">9</button>
-      <button type="button" id="btn-erase" class="key-btn" data-val="erase" title="Erase" aria-label="Erase">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-          <path d="M20 20H7L3 16c-.6-.6-.6-1.5 0-2.1l10-10c.6-.6 1.5-.6 2.1 0l6 6c.6.6.6 1.5 0 2.1L13 20"></path>
-          <path d="M6 11l7 7"></path>
-        </svg>
-      </button>
-      <button type="button" id="btn-undo" class="key-btn" data-val="undo" title="Undo" aria-label="Undo">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-          <path d="M3 7v6h6"></path>
-          <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
-        </svg>
-      </button>
     </div>
 
-    <div class="stats-container" aria-label="Statistics">
+    <div class="stats-container">
       <div class="stat-box">
         <span class="stat-label">Wins</span>
         <span id="stat-wins" class="stat-value">0</span>
@@ -181,7 +222,7 @@
         <span id="stat-best" class="stat-value">--:--</span>
       </div>
       <div class="stat-box">
-        <span class="stat-label">Average</span>
+        <span class="stat-label">Avg Time</span>
         <span id="stat-avg" class="stat-value">--:--</span>
       </div>
       <div class="stat-box">
@@ -190,31 +231,41 @@
       </div>
     </div>
 
-    <footer>3×3×3 Solid Sudoku Subcube • Killer Variant</footer>
-  </div>
+    <footer>
+      <p style="font-size: 0.9em; opacity: 0.8;">&copy; 2026 Murengu Mulindi</p>
+    </footer>
 
-  <!-- Interactive Tutorial Overlay -->
-  <div id="tutorial-overlay" class="tutorial-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
-    <div class="tutorial-box">
-      <div class="tutorial-header">
-        <h2 id="tutorial-title">Welcome to 3D</h2>
-        <button type="button" id="btn-close-tutorial" class="btn-icon" aria-label="Close Tutorial">&times;</button>
-      </div>
-      <div id="tutorial-text" class="tutorial-content"></div>
-      <div class="tutorial-actions">
-        <button type="button" id="btn-tut-prev" class="btn btn-secondary">Back</button>
-        <button type="button" id="btn-tut-next" class="btn btn-primary">Next</button>
+    <!-- Interactive Tutorial Overlay -->
+    <div id="tutorial-overlay" class="tutorial-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+      <div class="tutorial-box">
+        <div class="tutorial-header">
+          <h2 id="tutorial-title">How to Play</h2>
+          <button type="button" id="btn-close-tutorial" class="btn-icon" aria-label="Close Tutorial" style="width:28px; height:28px; border:none;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div class="tutorial-content" id="tutorial-text">Welcome to Killer Cubiku.</div>
+        <div class="tutorial-actions">
+          <button type="button" id="btn-tut-prev" class="btn btn-secondary">Back</button>
+          <button type="button" id="btn-tut-next" class="btn btn-primary">Next</button>
+        </div>
       </div>
     </div>
+
   </div>
 
-  <script src="game.js?v=124"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=124').catch(() => {});
+        navigator.serviceWorker.register('./sw.js?v=125')
+          .catch((err) => console.log('SW setup failed:', err));
       });
     }
   </script>
+  
+  <script src="./static/game.js?v=125"></script>
+
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "f395c849e3db4f80aed2070def3fae1e"}'></script><!-- End Cloudflare Web Analytics -->
+
 </body>
 </html>

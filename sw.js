@@ -1,32 +1,30 @@
-// Cubiku Variants v124 — Service Worker
-const CACHE_NAME = 'cubiku-killer-v124';
-const CORE_ASSETS = [
+const CACHE_NAME = 'cubiku-variants-v125';
+
+const ASSETS = [
   './',
   './index.html',
-  './style.css?v=124',
-  './game.js?v=124',
-  './manifest.json'
+  './static/style.css?v=125',
+  './static/game.js?v=125',
+  './static/icon-512.png',
+  './static/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(CORE_ASSETS))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS);
+    })
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key !== CACHE_NAME)
-            .map((key) => caches.delete(key))
-        )
-      )
-      .then(() => self.clients.claim())
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+      );
+    }).then(() => self.clients.claim())
   );
 });
 
@@ -36,39 +34,42 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Navigation requests (including shared ?k= URLs): network-first with cached shell fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', copy));
-          }
-          return response;
-        })
-        .catch(() =>
-          caches.match(event.request, { ignoreSearch: true })
-            .then((cached) => cached || caches.match('./index.html'))
-        )
+      caches.match(event.request, { ignoreSearch: true }).then((cachedNav) => {
+        const fallbackShell = Promise.resolve(cachedNav || caches.match('./index.html'));
+        const networkFetch = fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const clone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', clone));
+            }
+            return networkResponse;
+          })
+          .catch(() => fallbackShell);
+
+        return fallbackShell.then((cached) => cached || networkFetch);
+      })
     );
     return;
   }
 
-  // Static assets: cache-first with background refresh (stale-while-revalidate)
   event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then((cached) => {
-      const networkFetch = fetch(event.request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
-          return response;
+          return networkResponse;
         })
-        .catch(() => cached);
+        .catch((err) => {
+          if (cachedResponse) return cachedResponse;
+          throw err;
+        });
 
-      return cached || networkFetch;
+      return cachedResponse || fetchPromise;
     })
   );
 });

@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v123 — Killer 3D Sudoku (Base64URL ?k= Share + Tap-to-Hide Timer)
+ * Cubiku Variants v125 — Killer 3D Sudoku (Base64URL ?k= Share + Tap-to-Hide Timer)
  */
 
 let currentVariant = "killer";
