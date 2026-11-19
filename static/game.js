@@ -2037,7 +2037,7 @@ async function sharePuzzle() {
       if (iconCheck) iconCheck.style.display = 'none';
     }, 1600);
 
-    showMessage('Puzzle link copied to clipboard!', 'info');
+    showMessage('Puzzle link copied!', 'info');
   } catch (err) {
     showMessage('Could not copy puzzle link.', 'error');
   }
