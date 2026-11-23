@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v130 — Killer 3D Sudoku (Sound 3D logic grader + 3D-coupled cage generator)
+ * Cubiku Variants v131 — Killer 3D Sudoku (Sound 3D logic grader + 3D-coupled cage generator)
  */
 
 let currentVariant = "killer";
@@ -2441,6 +2441,13 @@ function handleGlobalPointerUp() {
   dragStartKey = null;
 }
 
+function getDigitFromKeyEvent(e) {
+  if (/^[1-9]$/.test(e.key)) return e.key;
+  if (e.code && /^Digit[1-9]$/.test(e.code)) return e.code.slice(5);
+  if (e.code && /^Numpad[1-9]$/.test(e.code)) return e.code.slice(6);
+  return null;
+}
+
 function onCellKeydown(e) {
   if (tutorialActive) return;
   const el = e.currentTarget; const z = Number(el.dataset.z), row = Number(el.dataset.row), col = Number(el.dataset.col);
@@ -2455,19 +2462,30 @@ function onCellKeydown(e) {
     }
     return;
   }
-  if (/^[1-9]$/.test(e.key)) {
+  const digitKey = !e.ctrlKey && !e.metaKey && !e.altKey ? getDigitFromKeyEvent(e) : null;
+  if (digitKey) {
     e.preventDefault();
-    if (selectedCells.size > 0) {
-      applyToSelection(e.key);
-      if (!stickyKeysEnabled && !pencilMode && selectedCells.size === 1) clearSelection();
-      else renderSelection();
-    } else if (!clueSet.has(`${z},${row},${col}`)) {
-      fillCell(z, row, col, e.key);
-      if (!stickyKeysEnabled && !pencilMode) clearSelection();
+    const wasPencil = pencilMode;
+    if (e.shiftKey) pencilMode = true;
+    try {
+      if (selectedCells.size > 0) {
+        applyToSelection(digitKey);
+        if (!stickyKeysEnabled && !pencilMode && selectedCells.size === 1) clearSelection();
+        else renderSelection();
+      } else if (!clueSet.has(`${z},${row},${col}`)) {
+        fillCell(z, row, col, digitKey);
+        if (!stickyKeysEnabled && !pencilMode) clearSelection();
+      }
+    } finally {
+      if (e.shiftKey) pencilMode = wasPencil;
     }
     return;
   }
-  if (e.key.toLowerCase() === 'p') { e.preventDefault(); pencilMode = !pencilMode; updateKeyboardUI(); return; }
+  if (e.key.toLowerCase() === 'p' || e.key === ' ' || e.code === 'Space') {
+    e.preventDefault();
+    if (!e.repeat) { pencilMode = !pencilMode; updateKeyboardUI(); }
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoLastAction(); return; }
   if (e.key === 'Escape') { clearSelection(); el.blur(); return; }
 
@@ -2832,7 +2850,15 @@ function init() {
   document.getElementById('btn-tut-next').addEventListener('click', nextTutorialStep);
   document.getElementById('btn-close-tutorial').addEventListener('click', endTutorial);
 
-  document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoLastAction(); } });
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoLastAction(); return; }
+    if (!e.defaultPrevented && !tutorialActive && !isGameComplete && (e.key === ' ' || e.code === 'Space')) {
+      const tag = e.target && e.target.tagName;
+      if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (e.target && e.target.getAttribute && e.target.getAttribute('role') === 'button')) return;
+      e.preventDefault();
+      if (!e.repeat) { pencilMode = !pencilMode; updateKeyboardUI(); }
+    }
+  });
   document.querySelectorAll('.key-btn').forEach(btn => btn.addEventListener('click', (e) => handleKeyboardTap(e.currentTarget.dataset.val)));
   document.addEventListener('click', (e) => {
     const settingsPanel = document.getElementById('settings-panel'); const btnM = document.getElementById('btn-menu');
