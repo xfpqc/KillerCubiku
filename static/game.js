@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v132 — Killer 3D Sudoku (Sound 3D logic grader + 3D-coupled cage generator)
+ * Cubiku Variants v133 — Killer 3D Sudoku (Sound 3D logic grader + 3D-coupled cage generator)
  */
 
 let currentVariant = "killer";
@@ -1856,7 +1856,12 @@ async function sharePuzzle() {
 
 function toggleMenu() {
   const panel = document.getElementById('settings-panel');
-  if (panel) panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'flex' : 'none';
+  if (!panel) return;
+  const isOpen = panel.style.display === 'flex';
+  if (isOpen && panel.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+  panel.style.display = isOpen ? 'none' : 'flex';
 }
 
 function cellId(z, row, col) { return `cell-${z}-${row}-${col}`; }
@@ -2545,6 +2550,9 @@ function handleKeyboardTap(valStr) {
 
 async function newGame() {
   if (isGeneratingNewGame) return;
+  if (document.activeElement && typeof document.activeElement.blur === 'function') {
+    document.activeElement.blur();
+  }
   isGeneratingNewGame = true;
   if (tutorialActive) endTutorial();
   if (window.location.search) {
@@ -2776,11 +2784,24 @@ function repairDOM() {
 function init() {
   repairDOM(); buildGrids(); loadPreferences(); loadStats(); loadCache();
   
-  const btnNew = document.getElementById('btn-new-game'); if (btnNew) btnNew.addEventListener('click', newGame);
-  const btnMenu = document.getElementById('btn-menu'); if (btnMenu) btnMenu.addEventListener('click', toggleMenu);
-  const btnShare = document.getElementById('btn-share'); if (btnShare) btnShare.addEventListener('click', sharePuzzle);
+  const btnNew = document.getElementById('btn-new-game');
+  if (btnNew) btnNew.addEventListener('click', (e) => {
+    if (e.detail > 0) e.currentTarget.blur();
+    newGame();
+  });
+  const btnMenu = document.getElementById('btn-menu');
+  if (btnMenu) btnMenu.addEventListener('click', (e) => {
+    if (e.detail > 0) e.currentTarget.blur();
+    toggleMenu();
+  });
+  const btnShare = document.getElementById('btn-share');
+  if (btnShare) btnShare.addEventListener('click', (e) => {
+    if (e.detail > 0) e.currentTarget.blur();
+    sharePuzzle();
+  });
   const btnRestart = document.getElementById('btn-restart');
-  if (btnRestart) btnRestart.addEventListener('click', () => {
+  if (btnRestart) btnRestart.addEventListener('click', (e) => {
+      if (e.detail > 0) e.currentTarget.blur();
       if (confirm("Are you sure you want to restart this puzzle from the beginning?")) {
           if (tutorialActive) endTutorial();
           for (let z = 0; z < 3; z++) for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) state[z][y][x] = initialGrid[z][y][x];
@@ -2793,7 +2814,10 @@ function init() {
 
   const timerBar = document.getElementById('timer-bar');
   if (timerBar) {
-    timerBar.addEventListener('click', toggleZen);
+    timerBar.addEventListener('click', (e) => {
+      if (e.detail > 0) e.currentTarget.blur();
+      toggleZen();
+    });
     timerBar.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -2859,10 +2883,21 @@ function init() {
       if (!e.repeat) { pencilMode = !pencilMode; updateKeyboardUI(); }
     }
   });
-  document.querySelectorAll('.key-btn').forEach(btn => btn.addEventListener('click', (e) => handleKeyboardTap(e.currentTarget.dataset.val)));
+  document.querySelectorAll('.key-btn').forEach(btn => btn.addEventListener('click', (e) => {
+    if (e.detail > 0) e.currentTarget.blur();
+    handleKeyboardTap(e.currentTarget.dataset.val);
+    if (e.detail > 0 && selected && !tutorialActive) {
+      getCell(selected.z, selected.row, selected.col)?.focus();
+    }
+  }));
   document.addEventListener('click', (e) => {
     const settingsPanel = document.getElementById('settings-panel'); const btnM = document.getElementById('btn-menu');
-    if (settingsPanel && settingsPanel.style.display === 'flex') if (!settingsPanel.contains(e.target) && !btnM.contains(e.target)) settingsPanel.style.display = 'none';
+    if (settingsPanel && settingsPanel.style.display === 'flex') {
+      if (!settingsPanel.contains(e.target) && !btnM.contains(e.target)) {
+        if (settingsPanel.contains(document.activeElement)) document.activeElement.blur();
+        settingsPanel.style.display = 'none';
+      }
+    }
   });
 
   document.addEventListener('pointermove', handleGlobalPointerMove);
