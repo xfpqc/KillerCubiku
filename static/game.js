@@ -1,5 +1,5 @@
 /**
- * Cubiku Variants v133 — Killer 3D Sudoku (Sound 3D logic grader + 3D-coupled cage generator)
+ * Cubiku Variants v134 — Killer 3D Sudoku (Sound 3D logic grader + 3D-coupled cage generator)
  */
 
 let currentVariant = "killer";
