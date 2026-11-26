@@ -1,5 +1,5 @@
 /* =========================================================
-   Cubiku Variants v134 — Dark & Paper Light Mode + Proportional Cell Typography
+   Cubiku Variants v135 — Restore Original Pencil Sizing + Proportional Main Digits
    ========================================================= */
 
 *, *::before, *::after {
@@ -344,8 +344,8 @@ body[data-mode="dark"] .slider::before { background-color: var(--text-primary); 
   flex-wrap: wrap;
   justify-content: center;
   align-content: center;
-  padding: 20% 2% 2%;
-  font-size: clamp(0.45rem, 19cqmin, 1.15rem);
+  padding: 22% 1px 0;
+  font-size: clamp(0.52rem, 2.15vw, 0.68rem);
   font-weight: 600;
   color: var(--accent);
   opacity: 1; 
@@ -484,6 +484,7 @@ footer { color: var(--text-muted); font-size: clamp(0.68rem, 2vw, 0.78rem); font
   .super-title { font-size: 1.1rem; }
   .slices-container { max-width: 1000px; width: 75vh; gap: 20px; }
   .grid { border-width: 4px; gap: 3px; border-radius: 10px; }
+  .cell.draft-mode { font-size: 0.9rem; }
   .keyboard-container { max-width: 65vh; gap: 12px; margin-top: 1.5rem !important; }
   .key-btn { height: 65px; font-size: 1.8rem; border-radius: 12px; }
   .stats-container { max-width: 800px; gap: 2rem; margin-top: 1.5rem !important; }
