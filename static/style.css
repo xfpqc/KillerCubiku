@@ -1,5 +1,5 @@
 /* =========================================================
-   Cubiku Variants v135 — Restore Original Pencil Sizing + Proportional Main Digits
+   Cubiku Variants v136 — SemiBold Clues & Steady Active-Cell Weight
    ========================================================= */
 
 *, *::before, *::after {
@@ -337,7 +337,7 @@ body[data-mode="dark"] .slider::before { background-color: var(--text-primary); 
 .cell:focus { outline: none; }
 
 .cage-sum { position: absolute; top: 5%; left: 6%; font-size: clamp(0.44rem, 18cqmin, 1.05rem); font-weight: 700; line-height: 1; color: var(--cage-sum-color); text-shadow: var(--cage-sum-shadow); opacity: 0.95; pointer-events: none; z-index: 5; }
-.cell.clue { color: var(--clue-color); font-weight: 700; cursor: default; }
+.cell.clue { color: var(--clue-color); font-weight: 600; cursor: default; }
 
 .cell.draft-mode {
   display: flex;
@@ -412,7 +412,6 @@ body.pencil-mode-active .cell.active-cell,
   background-image: none !important;
   box-shadow: inset 0 0 0 3px #FFFFFF !important;
   filter: none !important;
-  font-weight: 700;
   z-index: 3;
 }
 
